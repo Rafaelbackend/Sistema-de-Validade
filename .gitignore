@@ -1,2 +1,10 @@
+venv/
+.venv/
+env/
+ENV/
+
+**/__pycache__/
+*.py[cod]
+*$py.class
 *.zip
-.idea
+.idea/
