@@ -310,3 +310,39 @@ def verificar_credenciais(email: str, senha: str):
     finally:
         conn.close()
 
+def obter_dados_tv_db(dias):
+    hoje = datetime.now().date()
+    limite = hoje + timedelta(days=dias)
+    conn = conectar()
+    if not conn:
+        return False, "Sem conexão com o banco."
+    
+    try:
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                query = """
+                    SELECT 
+                        p.id_produto, 
+                        p.nome_produto, 
+                        p.validade, 
+                        p.qtd_estoque, 
+                        p.lote, 
+                        p.id_setor, 
+                        s.nome_setor, 
+                        a.nome as nome_adm,
+                        (SELECT STRING_AGG(c.nome, ', ') 
+                         FROM colaborador c 
+                         WHERE c.id_setor = p.id_setor) as responsaveis
+                    FROM produto p
+                    LEFT JOIN setor s ON p.id_setor = s.id_setor
+                    LEFT JOIN administrador_estoque a ON p.id_adm = a.id_adm
+                    WHERE p.validade <= %s
+                    ORDER BY p.validade ASC;
+                """
+                cur.execute(query, (limite,))
+                rows = cur.fetchall()
+                return True, rows
+    except Exception as e:
+        return False, str(e)
+    finally:
+        conn.close()
