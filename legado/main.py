@@ -1,19 +1,397 @@
+# interface_gui.py
+import os
 import tkinter as tk
-from tkinter import ttk
-from tkinter import messagebox
-from datetime import datetime
-from dotenv import load_dotenv
-from database import database as db
-from psycopg2.extras import RealDictCursor
-from ui.components import LoginWindow
-from ui.tv_mode import TVDisplay
+from tkinter import ttk, messagebox
+from datetime import datetime, timedelta
+import sys
 
-load_dotenv()
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
+# ---------------------------
+# Configuração de conexão DB
+# ---------------------------
+# Prioridade: variáveis de ambiente -> fallback estático
+def _env_or_default(key: str, default: str):
+    v = os.getenv(key)
+    return v if v is not None else default
+
+DB_PARAMS = {
+    "host": _env_or_default("DB_HOST", "localhost"),
+    "dbname": _env_or_default("DB_NAME", "Estoque_Mercado"),
+    "user": _env_or_default("DB_USER", "postgres"),
+    "password": _env_or_default("DB_PASS", "postgres"),
+    "port": int(_env_or_default("DB_PORT", "5432")),
+}
+
+# Mensagem útil para o usuário (opcional)
+# Você pode configurar as variáveis de ambiente: DB_HOST, DB_NAME, DB_USER, DB_PASS, DB_PORT
+
+# ---------- Conexão ----------
+def conectar():
+    try:
+        conn = psycopg2.connect(**DB_PARAMS)
+        return conn
+    except Exception as e:
+        # Em ambiente sem GUI (teste), evitar crash; se houver GUI, showerror.
+        try:
+            messagebox.showerror("Erro de conexão", f"Não foi possível conectar ao banco:\n{e}")
+        except Exception:
+            print("Erro de conexão:", e)
+        return None
+
+# ---------- Consultas / operações ----------
+def listar_produtos_db():
+    conn = conectar()
+    if not conn:
+        return []
+    try:
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT id_produto, codigo_barra, nome_produto, validade, qtd_estoque, preco, lote, id_setor, id_adm
+                    FROM produto
+                    ORDER BY validade NULLS LAST, nome_produto;
+                """)
+                return cur.fetchall()
+    except Exception as e:
+        messagebox.showerror("Erro", f"Erro ao listar produtos:\n{e}")
+        return []
+    finally:
+        conn.close()
+
+def inserir_produto_db(prod):
+    conn = conectar()
+    if not conn:
+        return False, "Sem conexão"
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO produto
+                    (codigo_barra, nome_produto, validade, qtd_estoque, preco, lote, id_setor, id_adm)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                    RETURNING id_produto;
+                """, (
+                    prod.get('codigo_barra'),
+                    prod.get('nome_produto'),
+                    prod.get('validade'),
+                    prod.get('qtd_estoque'),
+                    prod.get('preco'),
+                    prod.get('lote'),
+                    prod.get('id_setor'),
+                    prod.get('id_adm')
+                ))
+                return True, cur.fetchone()[0]
+    except Exception as e:
+        return False, str(e)
+    finally:
+        conn.close()
+
+def remover_produto_db(id_produto):
+    conn = conectar()
+    if not conn:
+        return False, "Sem conexão"
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM produto WHERE id_produto = %s;", (id_produto,))
+                return True, cur.rowcount
+    except Exception as e:
+        return False, str(e)
+    finally:
+        conn.close()
+
+def verificar_validade_db(alerta_dias=30):
+    hoje = datetime.now().date()
+    limite = hoje + timedelta(days=alerta_dias)
+    conn = conectar()
+    if not conn:
+        return []
+    try:
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT id_produto, nome_produto, validade, qtd_estoque, id_setor, id_adm
+                    FROM produto
+                    WHERE validade <= %s
+                    ORDER BY validade;
+                """, (limite,))
+                produtos = cur.fetchall()
+                for p in produtos:
+                    dias = (p['validade'] - hoje).days if p['validade'] else None
+                    mensagem = f"O produto '{p['nome_produto']}' vence em {dias} dias." if dias is not None else f"O produto '{p['nome_produto']}' possui validade indefinida."
+                    tipo = "AVISO DE VALIDADE"
+                    cur.execute("""
+                        INSERT INTO notificacao (id_produto, tipo_notificacao, mensagem, data_envio)
+                        VALUES (%s, %s, %s, %s);
+                    """, (p["id_produto"], tipo, mensagem, datetime.now()))
+                return produtos
+    except Exception as e:
+        messagebox.showerror("Erro", f"Erro ao verificar validade:\n{e}")
+        return []
+    finally:
+        conn.close()
+
+def listar_notificacoes_db(limit=100):
+    conn = conectar()
+    if not conn:
+        return []
+    try:
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT n.id_notificacao, p.nome_produto, n.tipo_notificacao, n.mensagem, n.data_envio,
+                           p.id_setor, p.id_adm
+                    FROM notificacao n
+                    LEFT JOIN produto p ON n.id_produto = p.id_produto
+                    ORDER BY n.data_envio DESC
+                    LIMIT %s;
+                """, (limit,))
+                return cur.fetchall()
+    except Exception as e:
+        messagebox.showerror("Erro", f"Erro ao listar notificações:\n{e}")
+        return []
+    finally:
+        conn.close()
+
+# --- Admin / Setor / Colaborador ----------
+def listar_administradores_db():
+    conn = conectar()
+    if not conn:
+        return []
+    try:
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT id_adm, nome, email FROM administrador_estoque ORDER BY nome;")
+                return cur.fetchall()
+    except Exception as e:
+        messagebox.showerror("Erro", f"Erro ao listar administradores:\n{e}")
+        return []
+    finally:
+        conn.close()
+
+def listar_setores_db():
+    conn = conectar()
+    if not conn:
+        return []
+    try:
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("SELECT id_setor, nome_setor FROM setor ORDER BY nome_setor;")
+                return cur.fetchall()
+    except Exception as e:
+        messagebox.showerror("Erro", f"Erro ao listar setores:\n{e}")
+        return []
+    finally:
+        conn.close()
+
+def listar_colaboradores_db():
+    conn = conectar()
+    if not conn:
+        return []
+    try:
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute("""
+                    SELECT c.id_colaborador, c.nome, c.email_celular, c.cargo, c.id_adm, c.id_setor,
+                           a.nome as nome_adm, s.nome_setor
+                    FROM colaborador c
+                    LEFT JOIN administrador_estoque a ON c.id_adm = a.id_adm
+                    LEFT JOIN setor s ON c.id_setor = s.id_setor
+                    ORDER BY c.nome;
+                """)
+                return cur.fetchall()
+    except Exception as e:
+        messagebox.showerror("Erro", f"Erro ao listar colaboradores:\n{e}")
+        return []
+    finally:
+        conn.close()
+
+def inserir_administrador_db(nome, email):
+    conn = conectar()
+    if not conn:
+        return False, "Sem conexão"
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO administrador_estoque (nome, email) VALUES (%s, %s) RETURNING id_adm;
+                """, (nome, email))
+                return True, cur.fetchone()[0]
+    except Exception as e:
+        return False, str(e)
+    finally:
+        conn.close()
+
+def inserir_setor_db(nome):
+    conn = conectar()
+    if not conn:
+        return False, "Sem conexão"
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("""INSERT INTO setor ("nome_setor") VALUES (%s) RETURNING id_setor;""", (nome,))
+                return True, cur.fetchone()[0]
+    except Exception as e:
+        return False, str(e)
+    finally:
+        conn.close()
+
+def inserir_colaborador_db(nome, email_celular, cargo, id_adm=None, id_setor=None):
+    conn = conectar()
+    if not conn:
+        return False, "Sem conexão"
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO colaborador (nome, email_celular, cargo, id_adm, id_setor)
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING id_colaborador;
+                """, (nome, email_celular, cargo, id_adm, id_setor))
+                return True, cur.fetchone()[0]
+    except psycopg2.Error as e:
+        msg = str(e)
+        suggestion = ""
+        if 'column "id_setor"' in msg.lower():
+            suggestion = ("\nSugestão: adicione a coluna id_setor na tabela colaborador com este comando SQL (execute no pgAdmin):\n\n"
+                          "ALTER TABLE colaborador ADD COLUMN id_setor INTEGER;\n\n")
+        return False, msg + suggestion
+    except Exception as e:
+        return False, str(e)
+    finally:
+        conn.close()
+
+def remover_administrador_db(id_adm):
+    conn = conectar()
+    if not conn:
+        return False, "Sem conexão"
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM administrador_estoque WHERE id_adm = %s;", (id_adm,))
+                return True, cur.rowcount
+    except Exception as e:
+        return False, str(e)
+    finally:
+        conn.close()
+
+def remover_colaborador_db(id_colaborador):
+    conn = conectar()
+    if not conn:
+        return False, "Sem conexão"
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM colaborador WHERE id_colaborador = %s;", (id_colaborador,))
+                return True, cur.rowcount
+    except Exception as e:
+        return False, str(e)
+    finally:
+        conn.close()
+
+# ---------- Interface Tkinter ----------
+class TVDisplay:
+    def __init__(self, master, refresh_seconds=30, alerta_dias=30):
+        self.win = tk.Toplevel(master)
+        self.win.title("Painel TV - Notificações")
+        self.win.attributes("-fullscreen", True)
+        self.win.config(bg="black")
+        self.refresh_seconds = refresh_seconds
+        self.alerta_dias = alerta_dias
+
+        self.frame = tk.Frame(self.win, bg="black")
+        self.frame.pack(fill="both", expand=True)
+
+        self.header = tk.Label(self.frame, text="NOTIFICAÇÕES DE VALIDADE", font=("Arial", 44, "bold"), bg="black", fg="white")
+        self.header.pack(pady=20)
+
+        self.txt = tk.Text(self.frame, bg="black", fg="white", font=("Arial", 28), bd=0, highlightthickness=0)
+        self.txt.pack(fill="both", expand=True, padx=40, pady=20)
+
+        self.footer = tk.Label(self.frame, text="Pressione ESC para sair do modo TV", font=("Arial", 18), bg="black", fg="white")
+        self.footer.pack(pady=10)
+
+        self.win.bind("<Escape>", lambda e: self.close())
+
+        self.running = True
+        self.update_once()
+        self._job = self.win.after(self.refresh_seconds * 1000, self._periodic)
+
+    def _periodic(self):
+        if not self.running:
+            return
+        self.update_once()
+        self._job = self.win.after(self.refresh_seconds * 1000, self._periodic)
+
+    def update_once(self):
+        hoje = datetime.now().date()
+        limite = hoje + timedelta(days=self.alerta_dias)
+        conn = conectar()
+        lines = []
+        if conn:
+            try:
+                with conn:
+                    with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                        # busca produtos que vencem até o limite
+                        cur.execute("""
+                            SELECT p.id_produto, p.nome_produto, p.validade, p.qtd_estoque,
+                                   p.lote, p.id_setor, s.nome_setor, p.id_adm, a.nome as nome_adm
+                            FROM produto p
+                            LEFT JOIN setor s ON p.id_setor = s.id_setor
+                            LEFT JOIN administrador_estoque a ON p.id_adm = a.id_adm
+                            WHERE p.validade <= %s
+                            ORDER BY p.validade;
+                        """, (limite,))
+                        rows = cur.fetchall()
+                        if not rows:
+                            lines.append("Nenhum produto próximo do vencimento.")
+                        else:
+                            for r in rows:
+                                dias = (r['validade'] - hoje).days if r['validade'] else "?"
+                                setor = r.get('nome_setor') or "—"
+                                # buscar colaboradores responsáveis pelo setor (id_setor)
+                                colaboradores = []
+                                if r.get('id_setor'):
+                                    cur.execute("""
+                                        SELECT nome FROM colaborador WHERE id_setor = %s ORDER BY nome;
+                                    """, (r['id_setor'],))
+                                    cols = cur.fetchall()
+                                    colaboradores = [c['nome'] for c in cols] if cols else []
+                                # se não houver colaborador no setor, fallback para administrador (se houver)
+                                if colaboradores:
+                                    responsaveis_text = ", ".join(colaboradores)
+                                else:
+                                    responsaveis_text = r.get('nome_adm') or "—"
+
+                                lines.append(f"Produto: {r['nome_produto']}  |  Validade: {r['validade']}  ({dias} dias)")
+                                lines.append(f"Qtd: {r['qtd_estoque']}  |  Lote: {r.get('lote') or '—'}  |  Setor: {setor}  |  Responsável(s): {responsaveis_text}")
+                                lines.append("-" * 120)
+            except Exception as e:
+                lines = [f"Erro ao carregar notificações: {e}"]
+            finally:
+                conn.close()
+        else:
+            lines = ["Sem conexão com o banco."]
+
+        self.txt.config(state="normal")
+        self.txt.delete("1.0", "end")
+        self.txt.insert("end", "\n\n".join(lines))
+        self.txt.config(state="disabled")
+
+    def close(self):
+        self.running = False
+        try:
+            if self._job:
+                self.win.after_cancel(self._job)
+        except Exception:
+            pass
+        self.win.destroy()
 
 class App:
-    def __init__(self, root, current_admin=None):
+    def __init__(self, root):
         self.root = root
-        self.current_admin = current_admin
         root.title("Controle de Validade - Interface Local")
         root.geometry("1200x700")
 
@@ -88,7 +466,7 @@ class App:
         self.atualizar_status("Carregando lista...")
         for i in self.tree.get_children():
             self.tree.delete(i)
-        rows = db.listar_produtos_db()
+        rows = listar_produtos_db()
         for r in rows:
             validade = r['validade']
             validade_str = validade.strftime("%d/%m/%Y") if validade else "-"
@@ -96,7 +474,7 @@ class App:
             setor = "-"
             responsavel = "-"
             try:
-                conn = db.conectar()
+                conn = conectar()
                 if conn:
                     with conn:
                         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -122,12 +500,12 @@ class App:
                                     a = cur.fetchone()
                                     responsavel = a['nome'] if a else "-"
             except Exception:
-                messagebox.showerror("Erro", "Ocorreu um erro ao carregar os dados do banco. Verifique a conexão e tente novamente.")
+                pass
             finally:
                 try:
                     conn.close()
                 except Exception:
-                    messagebox.showwarning("Aviso", "Não foi possível fechar a conexão com o banco. Verifique conexões abertas no gerenciador do banco de dados.")
+                    pass
 
             tag = ''
             if validade:
@@ -203,7 +581,7 @@ class App:
                 'id_setor': id_setor_val,
                 'id_adm': id_adm_val
             }
-            ok, resp = db.inserir_produto_db(prod)
+            ok, resp = inserir_produto_db(prod)
             if ok:
                 messagebox.showinfo("Sucesso", f"Produto criado. ID: {resp}")
                 win.destroy()
@@ -214,7 +592,7 @@ class App:
         ttk.Button(frm, text="Salvar", command=salvar).grid(row=len(labels), column=1, sticky="e", pady=8)
 
     def acao_verificar_validade(self):
-        produtos = db.verificar_validade_db(30)
+        produtos = verificar_validade_db(30)
         if not produtos:
             messagebox.showinfo("Validade", "Nenhum produto próximo do vencimento (30 dias).")
             return
@@ -230,7 +608,7 @@ class App:
         self.mostrar_lista()
 
     def mostrar_notificacoes(self):
-        rows = db.listar_notificacoes_db()
+        rows = listar_notificacoes_db()
         if not rows:
             messagebox.showinfo("Notificações", "Nenhuma notificação registrada.")
             return
@@ -256,7 +634,7 @@ class App:
             n = nome.get().strip(); e = email.get().strip()
             if not n:
                 messagebox.showwarning("Atenção", "Nome obrigatório"); return
-            ok, resp = db.inserir_administrador_db(n, e)
+            ok, resp = inserir_administrador_db(n, e)
             if ok:
                 messagebox.showinfo("Sucesso", f"Administrador criado. ID {resp}"); win.destroy()
             else:
@@ -274,7 +652,7 @@ class App:
             n = nome.get().strip()
             if not n:
                 messagebox.showwarning("Atenção", "Nome obrigatório"); return
-            ok, resp = db.inserir_setor_db(n)
+            ok, resp = inserir_setor_db(n)
             if ok:
                 messagebox.showinfo("Sucesso", f"Setor criado. ID {resp}"); win.destroy()
             else:
@@ -297,8 +675,8 @@ class App:
         cargo = ttk.Entry(frm, width=40); cargo.grid(row=2, column=1, pady=4)
 
         # Refresh admins and setores quando abrir o formulário
-        admins = db.listar_administradores_db()
-        setores = db.listar_setores_db()
+        admins = listar_administradores_db()
+        setores = listar_setores_db()
 
         ttk.Label(frm, text="Administrador responsável (opcional):").grid(row=3, column=0, sticky="w")
         admin_options = ["(Nenhum)"] + [f"{a['id_adm']} - {a['nome']}" for a in admins]
@@ -333,7 +711,7 @@ class App:
             id_adm_val = int(id_adm) if id_adm and str(id_adm).isdigit() else None
             id_setor_val = int(id_setor) if id_setor and str(id_setor).isdigit() else None
 
-            ok, resp = db.inserir_colaborador_db(n, ec, c, id_adm=id_adm_val, id_setor=id_setor_val)
+            ok, resp = inserir_colaborador_db(n, ec, c, id_adm=id_adm_val, id_setor=id_setor_val)
             if ok:
                 messagebox.showinfo("Sucesso", f"Colaborador criado. ID {resp}"); win.destroy()
             else:
@@ -342,7 +720,7 @@ class App:
         ttk.Button(frm, text="Salvar", command=salvar_colab).grid(row=5, column=1, sticky="e", pady=8)
 
     def mostrar_administradores(self):
-        rows = db.listar_administradores_db()
+        rows = listar_administradores_db()
         win = tk.Toplevel(self.root)
         win.title("Administradores de Estoque")
         win.geometry("600x400")
@@ -367,7 +745,7 @@ class App:
             nome = vals[1]
             if not messagebox.askyesno("Confirmar remoção", f"Remover administrador {nome} (ID {id_adm})?"):
                 return
-            ok, resp = db.remover_administrador_db(id_adm)
+            ok, resp = remover_administrador_db(id_adm)
             if ok:
                 messagebox.showinfo("Removido", f"Administrador ID {id_adm} removido.")
                 tree.delete(sel[0])
@@ -380,7 +758,7 @@ class App:
         ttk.Button(btn_frame, text="Fechar", command=win.destroy).pack(side="right")
 
     def mostrar_colaboradores(self):
-        rows = db.listar_colaboradores_db()
+        rows = listar_colaboradores_db()
         win = tk.Toplevel(self.root)
         win.title("Colaboradores")
         win.geometry("900x450")
@@ -406,7 +784,7 @@ class App:
             nome = vals[1]
             if not messagebox.askyesno("Confirmar remoção", f"Remover colaborador {nome} (ID {id_col})?"):
                 return
-            ok, resp = db.remover_colaborador_db(id_col)
+            ok, resp = remover_colaborador_db(id_col)
             if ok:
                 messagebox.showinfo("Removido", f"Colaborador ID {id_col} removido.")
                 tree.delete(sel[0])
@@ -427,7 +805,7 @@ class App:
             try:
                 self.tv_display.close()
             except Exception:
-                messagebox.showwarning("Aviso", "Ocorreu um erro ao fechar o painel TV. Tente novamente.")
+                pass
             self.tv_display = None
         self.root.bind("<F12>", lambda e: on_close_tv())
 
@@ -441,7 +819,7 @@ class App:
         nome = vals[2] if len(vals) > 2 else str(pid)
         if not messagebox.askyesno("Confirmar remoção", f"Remover o produto {nome} (ID {pid})?"):
             return
-        ok, resp = db.remover_produto_db(pid)
+        ok, resp = remover_produto_db(pid)
         if ok:
             messagebox.showinfo("Removido", f"Produto ID {pid} removido.")
             self.mostrar_lista()
@@ -450,13 +828,5 @@ class App:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    root.withdraw() # Esconde a principal até logar
-    login = LoginWindow(root)
-    root.wait_window(login.top)
-    
-    if login.result:
-        root.deiconify() # Mostra a principal
-        app = App(root, current_admin=login.admin)
-        root.mainloop()
-    else:
-        root.destroy()
+    app = App(root)
+    root.mainloop()
