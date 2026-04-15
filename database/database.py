@@ -1,8 +1,21 @@
 import os
 import hashlib
 import psycopg2
+import logging
 from psycopg2.extras import RealDictCursor
 from datetime import datetime, timedelta
+
+# Sistema de logging para erros e informações importantes.
+log_file = "debug_estoque.log"
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
+    handlers=[
+        logging.FileHandler(log_file, encoding='utf-8'), # Salva em arquivo
+        logging.StreamHandler() # Também mostra no terminal
+    ]
+)
+logger = logging.getLogger(__name__)
 
 def conectar():
     try:
@@ -15,7 +28,7 @@ def conectar():
         )
         return conn
     except Exception as e:
-        print(f"Erro de conexão: {e}")
+        logger.error(f"Falha crítica na conexão com o banco: {e}")
         return None
 
 def _hash_password(pw: str) -> str:
@@ -32,6 +45,9 @@ def listar_produtos_db():
                     FROM produto ORDER BY validade NULLS LAST, nome_produto;
                 """)
                 return cur.fetchall()
+    except Exception as e:
+        logger.error(f"Erro ao listar produtos: {e}")
+        return []
     finally:
         conn.close()
 
@@ -57,8 +73,11 @@ def inserir_produto_db(prod):
                     prod.get('id_setor'),
                     prod.get('id_adm')
                 ))
-                return True, cur.fetchone()[0]
+                res = cur.fetchone()[0]
+                logger.info(f"Produto inserido com sucesso: ID {res}")
+                return True, res
     except Exception as e:
+        logger.error(f"Erro ao inserir produto: {e}")
         return False, str(e)
     finally:
         conn.close()
@@ -71,8 +90,10 @@ def remover_produto_db(id_produto):
         with conn:
             with conn.cursor() as cur:
                 cur.execute("DELETE FROM produto WHERE id_produto = %s;", (id_produto,))
+                logger.info(f"Produto removido com sucesso: ID {id_produto}")
                 return True, cur.rowcount
     except Exception as e:
+        logger.error(f"Erro ao remover produto: {e}")
         return False, str(e)
     finally:
         conn.close()
@@ -101,9 +122,10 @@ def verificar_validade_db(alerta_dias=30):
                         INSERT INTO notificacao (id_produto, tipo_notificacao, mensagem, data_envio)
                         VALUES (%s, %s, %s, %s);
                     """, (p["id_produto"], tipo, mensagem, datetime.now()))
+                logger.info(f"Verificação de validade concluída. {len(produtos)}")
                 return produtos
     except Exception as e:
-        messagebox.showerror("Erro", f"Erro ao verificar validade:\n{e}")
+        logger.error(f"Erro no processamento de validade: {e}", exc_info=True)
         return []
     finally:
         conn.close()
@@ -125,7 +147,7 @@ def listar_notificacoes_db(limit=100):
                 """, (limit,))
                 return cur.fetchall()
     except Exception as e:
-        messagebox.showerror("Erro", f"Erro ao listar notificações:\n{e}")
+        logger.error(f"Erro ao listar notificações: {e}")
         return []
     finally:
         conn.close()
@@ -141,7 +163,7 @@ def listar_administradores_db():
                 cur.execute("SELECT id_adm, nome, email FROM administrador_estoque ORDER BY nome;")
                 return cur.fetchall()
     except Exception as e:
-        messagebox.showerror("Erro", f"Erro ao listar administradores:\n{e}")
+        logger.error(f"Erro ao listar administradores: {e}")
         return []
     finally:
         conn.close()
@@ -156,7 +178,7 @@ def listar_setores_db():
                 cur.execute("SELECT id_setor, nome_setor FROM setor ORDER BY nome_setor;")
                 return cur.fetchall()
     except Exception as e:
-        messagebox.showerror("Erro", f"Erro ao listar setores:\n{e}")
+        logger.error(f"Erro ao listar setores: {e}")
         return []
     finally:
         conn.close()
@@ -178,7 +200,7 @@ def listar_colaboradores_db():
                 """)
                 return cur.fetchall()
     except Exception as e:
-        messagebox.showerror("Erro", f"Erro ao listar colaboradores:\n{e}")
+        logger.error(f"Erro ao listar colaboradores: {e}")
         return []
     finally:
         conn.close()
@@ -201,6 +223,7 @@ def inserir_administrador_db(nome, email, senha=None):
                 """, (nome, email, hashed))
                 return True, cur.fetchone()[0]
     except Exception as e:
+        logger.error(f"Erro ao inserir administrador: {e}")
         return False, str(e)
     finally:
         conn.close()
@@ -215,6 +238,7 @@ def inserir_setor_db(nome):
                 cur.execute("""INSERT INTO setor ("nome_setor") VALUES (%s) RETURNING id_setor;""", (nome,))
                 return True, cur.fetchone()[0]
     except Exception as e:
+        logger.error(f"Erro ao inserir setor: {e}")
         return False, str(e)
     finally:
         conn.close()
@@ -232,14 +256,8 @@ def inserir_colaborador_db(nome, email_celular, cargo, id_adm=None, id_setor=Non
                     RETURNING id_colaborador;
                 """, (nome, email_celular, cargo, id_adm, id_setor))
                 return True, cur.fetchone()[0]
-    except psycopg2.Error as e:
-        msg = str(e)
-        suggestion = ""
-        if 'column "id_setor"' in msg.lower():
-            suggestion = ("\nSugestão: adicione a coluna id_setor na tabela colaborador com este comando SQL (execute no pgAdmin):\n\n"
-                          "ALTER TABLE colaborador ADD COLUMN id_setor INTEGER;\n\n")
-        return False, msg + suggestion
     except Exception as e:
+        logger.error(f"Erro ao inserir colaborador: {e}")
         return False, str(e)
     finally:
         conn.close()
@@ -254,6 +272,7 @@ def remover_administrador_db(id_adm):
                 cur.execute("DELETE FROM administrador_estoque WHERE id_adm = %s;", (id_adm,))
                 return True, cur.rowcount
     except Exception as e:
+        logger.error(f"Erro ao remover administrador: {e}")
         return False, str(e)
     finally:
         conn.close()
@@ -268,6 +287,7 @@ def remover_colaborador_db(id_colaborador):
                 cur.execute("DELETE FROM colaborador WHERE id_colaborador = %s;", (id_colaborador,))
                 return True, cur.rowcount
     except Exception as e:
+        logger.error(f"Erro ao remover colaborador: {e}")
         return False, str(e)
     finally:
         conn.close()
@@ -290,22 +310,25 @@ def verificar_credenciais(email: str, senha: str):
                 row = cur.fetchone()
                 if not row:
                     return False, "Administrador não encontrado."
+                
                 stored = row.get("senha")
                 if stored is None:
                     return False, "Administrador sem senha definida. Atualize a senha no banco."
+                
                 # Se tiver 64 caracteres e for hexadecimal, assumimos SHA-256
-                if isinstance(stored, str) and len(stored) == 64 and all(c in "0123456789abcdefABCDEF" for c in stored):
-                    if _hash_password(senha) == stored.lower():
-                        return True, row
-                    else:
-                        return False, "Senha incorreta."
+                if isinstance(stored, str) and len(stored) == 64:
+                    is_valid = (_hash_password(senha) == stored.lower())
                 else:
-                    # comparação texto-plano (compatibilidade)
-                    if senha == stored:
-                        return True, row
-                    else:
-                        return False, "Senha incorreta."
+                    is_valid = (senha == stored)
+
+                if is_valid:
+                    logger.info(f"Login bem-sucedido: {email}")
+                    return True, row
+                else:
+                    logger.warning(f"Tentativa de login inválida para: {email}")
+                    return False, "Senha incorreta."
     except Exception as e:
+        logger.error(f"Erro ao verificar credenciais: {e}")
         return False, str(e)
     finally:
         conn.close()
