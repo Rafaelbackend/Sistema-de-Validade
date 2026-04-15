@@ -1,7 +1,9 @@
 import os
 import hashlib
+from dotenv import load_dotenv
 import psycopg2
 import logging
+from psycopg2 import pool
 from psycopg2.extras import RealDictCursor
 from datetime import datetime, timedelta
 
@@ -17,25 +19,53 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def conectar():
-    try:
-        conn = psycopg2.connect(
-            host=os.getenv("DB_HOST", "localhost"),
-            dbname=os.getenv("DB_NAME", "Estoque_Mercado"),
-            user=os.getenv("DB_USER", "postgres"),
-            password=os.getenv("DB_PASS", "postgres"),
-            port=int(os.getenv("DB_PORT", "5432"))
-        )
-        return conn
-    except Exception as e:
-        logger.error(f"Falha crítica na conexão com o banco: {e}")
-        return None
+load_dotenv()
+
+class DatabaseManager:
+    _instance = None
+    _pool = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(DatabaseManager, cls).__new__(cls)
+            cls._instance._initialize_pool()
+        return cls._instance
+
+    def _initialize_pool(self):
+        try:
+            self._pool = pool.ThreadedConnectionPool(
+                minconn=1,
+                maxconn=10,
+                host=os.getenv("DB_HOST", "localhost"),
+                dbname=os.getenv("DB_NAME", "Estoque_Mercado"),
+                user=os.getenv("DB_USER", "postgres"),
+                password=os.getenv("DB_PASS", "postgres"),
+                port=int(os.getenv("DB_PORT", "5432"))
+            )
+            logger.info("Pool de conexões Singleton iniciado.")
+        except Exception as e:
+            logger.error(f"Falha crítica ao iniciar o Pool: {e}")
+            raise e
+
+    def get_connection(self):
+        return self._pool.getconn()
+
+    def put_connection(self, conn):
+        self._pool.putconn(conn)
+
+    def close_all(self):
+        if self._pool:
+            self._pool.closeall()
+            logger.info("Todas as conexões do pool foram encerradas.")
+
+# Instanciamos uma vez para todo o sistema usar
+db_manager = DatabaseManager()
 
 def _hash_password(pw: str) -> str:
     return hashlib.sha256(pw.encode("utf-8")).hexdigest()
 
 def listar_produtos_db():
-    conn = conectar()
+    conn = db_manager.get_connection()
     if not conn: return []
     try:
         with conn:
@@ -49,15 +79,20 @@ def listar_produtos_db():
         logger.error(f"Erro ao listar produtos: {e}")
         return []
     finally:
-        conn.close()
+        if conn:
+            db_manager.put_connection(conn)
 
 def inserir_produto_db(prod):
-    conn = conectar()
+    conn = db_manager.get_connection()
     if not conn:
         return False, "Sem conexão"
     try:
         with conn:
             with conn.cursor() as cur:
+                validade = prod.get('validade')
+                if not validade or str(validade).strip() == "":
+                    validade = None
+
                 cur.execute("""
                     INSERT INTO produto
                     (codigo_barra, nome_produto, validade, qtd_estoque, preco, lote, id_setor, id_adm)
@@ -66,7 +101,7 @@ def inserir_produto_db(prod):
                 """, (
                     prod.get('codigo_barra'),
                     prod.get('nome_produto'),
-                    prod.get('validade'),
+                    validade,
                     prod.get('qtd_estoque'),
                     prod.get('preco'),
                     prod.get('lote'),
@@ -80,10 +115,11 @@ def inserir_produto_db(prod):
         logger.error(f"Erro ao inserir produto: {e}")
         return False, str(e)
     finally:
-        conn.close()
+        if conn:
+            db_manager.put_connection(conn)
 
 def remover_produto_db(id_produto):
-    conn = conectar()
+    conn = db_manager.get_connection()
     if not conn:
         return False, "Sem conexão"
     try:
@@ -96,12 +132,13 @@ def remover_produto_db(id_produto):
         logger.error(f"Erro ao remover produto: {e}")
         return False, str(e)
     finally:
-        conn.close()
+        if conn:
+            db_manager.put_connection(conn)
 
 def verificar_validade_db(alerta_dias=30):
     hoje = datetime.now().date()
     limite = hoje + timedelta(days=alerta_dias)
-    conn = conectar()
+    conn = db_manager.get_connection()
     if not conn:
         return []
     try:
@@ -128,10 +165,11 @@ def verificar_validade_db(alerta_dias=30):
         logger.error(f"Erro no processamento de validade: {e}", exc_info=True)
         return []
     finally:
-        conn.close()
+        if conn:
+            db_manager.put_connection(conn)
 
 def listar_notificacoes_db(limit=100):
-    conn = conectar()
+    conn = db_manager.get_connection()
     if not conn:
         return []
     try:
@@ -150,11 +188,12 @@ def listar_notificacoes_db(limit=100):
         logger.error(f"Erro ao listar notificações: {e}")
         return []
     finally:
-        conn.close()
+        if conn:
+            db_manager.put_connection(conn)
 
 # --- Admin / Setor / Colaborador ----------
 def listar_administradores_db():
-    conn = conectar()
+    conn = db_manager.get_connection()
     if not conn:
         return []
     try:
@@ -166,10 +205,11 @@ def listar_administradores_db():
         logger.error(f"Erro ao listar administradores: {e}")
         return []
     finally:
-        conn.close()
+        if conn:
+            db_manager.put_connection(conn)
 
 def listar_setores_db():
-    conn = conectar()
+    conn = db_manager.get_connection()
     if not conn:
         return []
     try:
@@ -181,10 +221,11 @@ def listar_setores_db():
         logger.error(f"Erro ao listar setores: {e}")
         return []
     finally:
-        conn.close()
+        if conn:
+            db_manager.put_connection(conn)
 
 def listar_colaboradores_db():
-    conn = conectar()
+    conn = db_manager.get_connection()
     if not conn:
         return []
     try:
@@ -203,7 +244,8 @@ def listar_colaboradores_db():
         logger.error(f"Erro ao listar colaboradores: {e}")
         return []
     finally:
-        conn.close()
+        if conn:
+            db_manager.put_connection(conn)
 
 def inserir_administrador_db(nome, email, senha=None):
     """
@@ -211,7 +253,7 @@ def inserir_administrador_db(nome, email, senha=None):
     Se senha for fornecida, armazena o HASH (SHA-256).
     Retorna (True, id_adm) ou (False, mensagem).
     """
-    conn = conectar()
+    conn = db_manager.get_connection()
     if not conn:
         return False, "Sem conexão"
     try:
@@ -226,10 +268,11 @@ def inserir_administrador_db(nome, email, senha=None):
         logger.error(f"Erro ao inserir administrador: {e}")
         return False, str(e)
     finally:
-        conn.close()
+        if conn:
+            db_manager.put_connection(conn)
 
 def inserir_setor_db(nome):
-    conn = conectar()
+    conn = db_manager.get_connection()
     if not conn:
         return False, "Sem conexão"
     try:
@@ -241,10 +284,11 @@ def inserir_setor_db(nome):
         logger.error(f"Erro ao inserir setor: {e}")
         return False, str(e)
     finally:
-        conn.close()
+        if conn:
+            db_manager.put_connection(conn)
 
 def inserir_colaborador_db(nome, email_celular, cargo, id_adm=None, id_setor=None):
-    conn = conectar()
+    conn = db_manager.get_connection()
     if not conn:
         return False, "Sem conexão"
     try:
@@ -260,10 +304,11 @@ def inserir_colaborador_db(nome, email_celular, cargo, id_adm=None, id_setor=Non
         logger.error(f"Erro ao inserir colaborador: {e}")
         return False, str(e)
     finally:
-        conn.close()
+        if conn:
+            db_manager.put_connection(conn)
 
 def remover_administrador_db(id_adm):
-    conn = conectar()
+    conn = db_manager.get_connection()
     if not conn:
         return False, "Sem conexão"
     try:
@@ -275,10 +320,11 @@ def remover_administrador_db(id_adm):
         logger.error(f"Erro ao remover administrador: {e}")
         return False, str(e)
     finally:
-        conn.close()
+        if conn:
+            db_manager.put_connection(conn)
 
 def remover_colaborador_db(id_colaborador):
-    conn = conectar()
+    conn = db_manager.get_connection()
     if not conn:
         return False, "Sem conexão"
     try:
@@ -290,7 +336,8 @@ def remover_colaborador_db(id_colaborador):
         logger.error(f"Erro ao remover colaborador: {e}")
         return False, str(e)
     finally:
-        conn.close()
+        if conn:
+            db_manager.put_connection(conn)
 
 def verificar_credenciais(email: str, senha: str):
     """
@@ -300,7 +347,7 @@ def verificar_credenciais(email: str, senha: str):
       - senha no banco em texto plano (ex.: '1234'): compara diretamente
     Retorna (True, admin_row) ou (False, mensagem).
     """
-    conn = conectar()
+    conn = db_manager.get_connection()
     if not conn:
         return False, "Sem conexão"
     try:
@@ -331,12 +378,13 @@ def verificar_credenciais(email: str, senha: str):
         logger.error(f"Erro ao verificar credenciais: {e}")
         return False, str(e)
     finally:
-        conn.close()
+        if conn:
+            db_manager.put_connection(conn)
 
 def obter_dados_tv_db(dias):
     hoje = datetime.now().date()
     limite = hoje + timedelta(days=dias)
-    conn = conectar()
+    conn = db_manager.get_connection()
     if not conn:
         return False, "Sem conexão com o banco."
     
@@ -368,4 +416,5 @@ def obter_dados_tv_db(dias):
     except Exception as e:
         return False, str(e)
     finally:
-        conn.close()
+        if conn:
+            db_manager.put_connection(conn)

@@ -1,0 +1,13 @@
+2026-04-15 12:10:44,290 - INFO - [database.py:45] - Pool de conexões Singleton iniciado.
+2026-04-15 12:10:53,683 - INFO - [database.py:368] - Login bem-sucedido: rafaelvbarbosa@gmail.com
+2026-04-15 12:12:01,419 - INFO - [database.py:108] - Produto inserido com sucesso: ID 2
+2026-04-15 12:13:30,177 - INFO - [database.py:108] - Produto inserido com sucesso: ID 3
+2026-04-15 12:16:33,105 - INFO - [database.py:45] - Pool de conexões Singleton iniciado.
+2026-04-15 12:16:39,956 - INFO - [database.py:368] - Login bem-sucedido: rafaelvbarbosa@gmail.com
+2026-04-15 12:17:25,268 - ERROR - [database.py:111] - Erro ao inserir produto: ERRO:  o valor nulo na coluna "validade" da relação "produto" viola a restrição de não-nulo
+DETAIL:  Registro que falhou contém (4, 5689, cajado de mago tier 2, null, 10, 986.34, jkkingbrs3954, null, null).
+
+2026-04-15 12:18:05,906 - INFO - [database.py:108] - Produto inserido com sucesso: ID 5
+2026-04-15 12:24:47,810 - INFO - [database.py:45] - Pool de conexões Singleton iniciado.
+2026-04-15 12:24:55,778 - INFO - [database.py:372] - Login bem-sucedido: rafaelvbarbosa@gmail.com
+2026-04-15 12:25:09,977 - INFO - [database.py:162] - Verificação de validade concluída. 2

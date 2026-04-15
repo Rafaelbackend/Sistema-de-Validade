@@ -91,7 +91,7 @@ class AppMainWindow:
             responsavel = "-"
             
             try:
-                conn = db.conectar()
+                conn = db.db_manager.get_connection()
                 if conn:
                     with conn:
                         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -117,11 +117,9 @@ class AppMainWindow:
             except Exception:
                 messagebox.showerror("Erro", "Ocorreu um erro ao carregar os dados do banco.")
             finally:
-                try:
-                    if conn:
-                        conn.close()
-                except Exception:
-                    pass
+                if conn:
+                    db.db_manager.put_connection(conn)
+                
 
             tag = ''
             if validade:
