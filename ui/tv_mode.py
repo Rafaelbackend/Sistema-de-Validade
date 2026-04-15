@@ -54,39 +54,42 @@ class TVDisplay:
         self._refresh_job = self.win.after(self.refresh_seconds * 1000, self._periodic_refresh)
 
     def update_once(self):
-        hoje = datetime.now().date()
-        ok, rows = db.obter_dados_tv_db(self.alerta_dias)
-        
-        lines = []
-        if not ok:
-            lines = [f"Erro ao carregar dados: {rows}"]
-        elif not rows:
-            lines = ["Nenhum produto próximo do vencimento."]
-        else:
-            for r in rows:
-                validade = r.get('validade')
-                validade_str = validade.strftime("%d/%m/%Y") if validade else "—"
-                dias = (validade - hoje).days if validade else "?"
-                setor = r.get('nome_setor') or "—"
-                
-                responsaveis_text = r.get('responsaveis') or r.get('nome_adm') or "—"
+        if not self.running or not self.win.winfo_exists():
+            return
 
-                lines.append(f"Produto: {r['nome_produto']}  |  Validade: {validade_str}  ({dias} dias)")
-                lines.append(f"Qtd: {r['qtd_estoque']}  |  Lote: {r.get('lote') or '—'}  |  Setor: {setor}  |  Responsável(s): {responsaveis_text}")
-                lines.append("-" * 100)
-
-        self.txt.config(state="normal")
-        self.txt.delete("1.0", "end")
-        content = "\n\n".join(lines)
-        content += "\n\n\n\n"
-        self.txt.insert("end", content)
-        self.txt.config(state="disabled")
-
-        self.scroll_pos = 0.0
         try:
-            self.txt.yview_moveto(0.0)
-        except Exception:
-            pass
+            hoje = datetime.now().date()
+            ok, rows = db.obter_dados_tv_db(self.alerta_dias)
+            
+            lines = []
+            if not ok:
+                lines = [f"Erro ao carregar dados: {rows}"]
+            elif not rows:
+                lines = ["Nenhum produto próximo do vencimento."]
+            else:
+                for r in rows:
+                    validade = r.get('validade')
+                    validade_str = validade.strftime("%d/%m/%Y") if validade else "—"
+                    dias = (validade - hoje).days if validade else "?"
+                    setor = r.get('nome_setor') or "—"
+                    responsaveis_text = r.get('responsaveis') or r.get('nome_adm') or "—"
+
+                    lines.append(f"Produto: {r['nome_produto']}  |  Validade: {validade_str}  ({dias} dias)")
+                    lines.append(f"Qtd: {r['qtd_estoque']}  |  Lote: {r.get('lote') or '—'}  |  Setor: {setor}  |  Responsável(s): {responsaveis_text}")
+                    lines.append("-" * 100)
+
+            if self.txt.winfo_exists():
+                self.txt.config(state="normal")
+                self.txt.delete("1.0", "end")
+                content = "\n\n".join(lines) + "\n\n\n\n"
+                self.txt.insert("end", content)
+                self.txt.config(state="disabled")
+
+                self.scroll_pos = 0.0
+                self.txt.yview_moveto(0.0)
+
+        except Exception as e:
+            print(f"Erro silencioso no update_once: {e}")
 
     def _start_scrolling(self):
         if self._scroll_job:
@@ -123,14 +126,13 @@ class TVDisplay:
 
     def close(self):
         self.running = False
-        try:
-            if self._scroll_job:
-                self.win.after_cancel(self._scroll_job)
-        except Exception:
-            pass
-        try:
-            if self._refresh_job:
-                self.win.after_cancel(self._refresh_job)
-        except Exception:
-            pass
+        
+        if self._scroll_job:
+            self.win.after_cancel(self._scroll_job)
+            self._scroll_job = None
+    
+        if self._refresh_job:
+            self.win.after_cancel(self._refresh_job)
+            self._refresh_job = None
+    
         self.win.destroy()

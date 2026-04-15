@@ -162,13 +162,10 @@ class AppMainWindow:
         if self.tv_display:
             messagebox.showinfo("TV", "O painel TV já está aberto.")
             return
+        
         self.tv_display = TVDisplay(self.root, refresh_seconds=30, alerta_dias=30)
         
-        def on_close_tv(e=None):
-            try:
-                self.tv_display.close()
-            except Exception:
-                messagebox.showwarning("Aviso", "Ocorreu um erro ao fechar o painel TV. Tente novamente.")
-            self.tv_display = None
-            
-        self.root.bind("<F12>", lambda e: on_close_tv())
+        self.tv_display.win.bind("<Destroy>", lambda e: self.reset_tv_ref())
+
+    def reset_tv_ref(self):
+        self.tv_display = None
