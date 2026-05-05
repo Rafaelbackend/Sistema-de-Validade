@@ -15,7 +15,7 @@ class FormManager:
         frm = ttk.Frame(win, padding=10)
         frm.pack(fill="both", expand=True)
 
-        labels = ["Código de barras", "Nome do produto", "Validade (YYYY-MM-DD)", "Quantidade", "Preço", "Lote", "ID do Setor", "ID do Admin"]
+        labels = ["Código de barras", "Nome do produto", "Validade (DD-MM-YYYY)", "Quantidade", "Preço", "Lote", "ID do Setor", "ID do Admin"]
         entries = {}
         for i, lbl in enumerate(labels):
             ttk.Label(frm, text=lbl).grid(row=i, column=0, sticky="w", pady=4)
@@ -40,9 +40,9 @@ class FormManager:
             validade = None
             if validade_text:
                 try:
-                    validade = datetime.strptime(validade_text, "%Y-%m-%d").date()
+                    validade = datetime.strptime(validade_text, "%d-%m-%Y").date()
                 except Exception:
-                    messagebox.showwarning("Atenção", "Formato de validade inválido. Use YYYY-MM-DD.")
+                    messagebox.showwarning("Atenção", "Formato de validade inválido. Use DD-MM-YYYY.")
                     return
             try:
                 qtd = int(qtd_text) if qtd_text else 0

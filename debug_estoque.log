@@ -11,3 +11,9 @@ DETAIL:  Registro que falhou contém (4, 5689, cajado de mago tier 2, null, 10, 
 2026-04-15 12:24:47,810 - INFO - [database.py:45] - Pool de conexões Singleton iniciado.
 2026-04-15 12:24:55,778 - INFO - [database.py:372] - Login bem-sucedido: rafaelvbarbosa@gmail.com
 2026-04-15 12:25:09,977 - INFO - [database.py:162] - Verificação de validade concluída. 2
+2026-05-05 19:23:23,133 - INFO - [database.py:45] - Pool de conexões Singleton iniciado.
+2026-05-05 19:23:32,184 - INFO - [database.py:372] - Login bem-sucedido: marcos@gmail.com
+2026-05-05 19:25:07,834 - INFO - [database.py:112] - Produto inserido com sucesso: ID 2
+2026-05-05 19:25:45,297 - INFO - [database.py:112] - Produto inserido com sucesso: ID 3
+2026-05-05 19:25:47,820 - INFO - [database.py:162] - Verificação de validade concluída. 1
+2026-05-05 19:25:52,917 - INFO - [database.py:129] - Produto removido com sucesso: ID 3
