@@ -17,3 +17,24 @@ DETAIL:  Registro que falhou contém (4, 5689, cajado de mago tier 2, null, 10, 
 2026-05-05 19:25:45,297 - INFO - [database.py:112] - Produto inserido com sucesso: ID 3
 2026-05-05 19:25:47,820 - INFO - [database.py:162] - Verificação de validade concluída. 1
 2026-05-05 19:25:52,917 - INFO - [database.py:129] - Produto removido com sucesso: ID 3
+2026-05-05 19:45:55,365 - INFO - [database.py:45] - Pool de conexões Singleton iniciado.
+2026-05-05 19:46:28,005 - INFO - [database.py:45] - Pool de conexões Singleton iniciado.
+2026-05-05 19:46:35,608 - INFO - [database.py:372] - Login bem-sucedido: rafaelvbarbosa@gmail.com
+2026-05-05 19:47:10,668 - INFO - [database.py:112] - Produto inserido com sucesso: ID 4
+2026-05-05 19:47:47,162 - INFO - [database.py:45] - Pool de conexões Singleton iniciado.
+2026-05-05 19:47:54,743 - INFO - [database.py:372] - Login bem-sucedido: marcos@gmail.com
+2026-05-05 19:49:38,892 - INFO - [database.py:112] - Produto inserido com sucesso: ID 5
+2026-05-05 19:49:59,765 - INFO - [database.py:45] - Pool de conexões Singleton iniciado.
+2026-05-05 19:50:05,536 - INFO - [database.py:372] - Login bem-sucedido: marcos@gmail.com
+2026-05-05 19:54:58,034 - INFO - [database.py:45] - Pool de conexões Singleton iniciado.
+2026-05-05 19:55:03,879 - INFO - [database.py:372] - Login bem-sucedido: marcos@gmail.com
+2026-05-05 20:06:51,224 - INFO - [database.py:45] - Pool de conexões Singleton iniciado.
+2026-05-05 20:06:57,549 - INFO - [database.py:372] - Login bem-sucedido: marcos@gmail.com
+2026-05-05 20:10:00,336 - INFO - [database.py:45] - Pool de conexões Singleton iniciado.
+2026-05-05 20:10:06,367 - INFO - [database.py:372] - Login bem-sucedido: marcos@gmail.com
+2026-05-05 20:11:40,990 - INFO - [database.py:112] - Produto inserido com sucesso: ID 6
+2026-05-05 20:12:44,770 - INFO - [database.py:112] - Produto inserido com sucesso: ID 7
+2026-05-05 20:15:25,311 - INFO - [database.py:45] - Pool de conexões Singleton iniciado.
+2026-05-05 20:15:30,751 - INFO - [database.py:372] - Login bem-sucedido: marcos@gmail.com
+2026-05-05 20:15:56,985 - INFO - [database.py:45] - Pool de conexões Singleton iniciado.
+2026-05-05 20:16:02,684 - INFO - [database.py:372] - Login bem-sucedido: marcos@gmail.com
