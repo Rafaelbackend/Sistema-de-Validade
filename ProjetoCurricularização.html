@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Controle de Validade</title>
+    <style>
+        html {
+            scroll-behavior: smooth;
+        }
+        /* Reset e configurações básicas */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Estilos para impressão */
+        @media print {
+            .highlight-box,
+            .info-table,
+            .arquitetura-box,
+            .roadmap-item {
+                break-inside: avoid;
+            }
+            @page {
+                size: A4;
+                margin: 2cm 1.5cm;
+            }
+            
+            body {
+                font-size: 11pt;
+                line-height: 1.4;
+                color: #000;
+                background: white;
+            }
+            
+            .no-print {
+                display: none !important;
+            }
+            
+            .page-break {
+                page-break-before: always;
+            }
+            
+            table {
+                break-inside: avoid;
+            }
+            
+            h1, h2, h3 {
+                break-after: avoid;
+            }
+            
+            .section {
+                break-inside: avoid;
+            }
+        }
+
+        /* Estilos gerais */
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #fff;
+        }
+
+        /* Cabeçalho principal */
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px 0;
+            border-bottom: 3px solid #1a365d;
+        }
+
+        .header h1 {
+            font-size: 18pt;
+            font-weight: bold;
+            color: #1a365d;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .header h2 {
+            font-size: 14pt;
+            color: #4a5568;
+            font-weight: normal;
+            font-style: italic;
+        }
+
+        /* Seções */
+        .section {
+            margin-bottom: 25px;
+            padding: 15px 0;
+        }
+
+        .section-title {
+            font-size: 14pt;
+            font-weight: bold;
+            color: #1a365d;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e2e8f0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .subsection-title {
+            font-size: 12pt;
+            font-weight: bold;
+            color: #2d3748;
+            margin: 15px 0 10px 0;
+        }
+
+        /* Tabelas */
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            font-size: 11pt;
+            break-inside: avoid;
+        }
+
+        .info-table th,
+        .info-table td {
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        .info-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+            color: #1a365d;
+        }
+
+        .info-table td:first-child {
+            font-weight: bold;
+            background-color: #f8f9fa;
+            width: 30%;
+        }
+
+        /* Boxes especiais */
+        .highlight-box {
+            background-color: #e6fffa;
+            border: 2px solid #38b2ac;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            break-inside: avoid;
+        }
+
+        .highlight-box h3 {
+            color: #2c7a7b;
+            margin-bottom: 15px;
+            font-size: 14pt;
+        }
+
+        /* Status/tags */
+        .status-tag {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 10pt;
+            font-weight: bold;
+            margin: 2px;
+        }
+        /* Listas */
+        .feature-list {
+            margin: 15px 0 15px 30px;
+        }
+
+        .feature-list li {
+            margin-bottom: 8px;
+            list-style-type: disc;
+            line-height: 1.5;
+        }
+
+        /* Roadmap */
+        .roadmap-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 15px;
+            padding: 10px;
+            border-left: 4px solid #cbd5e0;
+            background-color: #f7fafc;
+        }
+
+        .roadmap-concluido {
+            border-left-color: #38a169;
+            background-color: #f0fff4;
+        }
+
+        .roadmap-andamento {
+            border-left-color: #ed8936;
+            background-color: #fffbeb;
+        }
+
+        .roadmap-planejado {
+            border-left-color: #4299e1;
+            background-color: #ebf8ff;
+        }
+
+        /* Arquitetura */
+        .arquitetura-box {
+            background-color: #edf2f7;
+            border: 1px solid #cbd5e0;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 10pt;
+            white-space: pre-line;
+            overflow-x: auto;
+        }
+
+        /* Rodapé */
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 2px solid #e2e8f0;
+            font-size: 10pt;
+            color: #6b7280;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>PRD FINAL - Controle de Validade de Estoque</h1>
+        <h2>Documento de Requisitos do Produto (PRD) - Versão Completa e Atualizada</h2>
+    </div>
+
+    <div class="highlight-box">
+        <h3>PROJETO DE CURRICULARIZAÇÃO</h3>
+        <p>O <strong>Controle de Validade de Estoque</strong> será desenvolvido como <strong>Projeto Interdisciplinar de Curricularização</strong> conforme as especificações técnicas e requisitos funcionais definidos neste PRD.</p>
+        <hr style="margin: 15px 0; border: none; border-top: 1px solid #38b2ac;">
+        <p><strong>Objetivo:</strong> Desenvolver sistema desktop funcional para controle de validade de estoque<br>
+        <strong>Prazo Previsto:</strong> 3 meses de desenvolvimento (Backend e Frontend)<br>
+        <strong>Aprovação do Stakeholder:</strong> Gerente responsável pelo Supermercado Mariano<br>
+        <strong>Modelo de Entrega:</strong> Sistema funcional em ambiente local com possibilidade futura de expansão e hospedagem remota</p>
+    </div>
+
+    <div class="section">
+        <div class="section-title">INFORMAÇÕES DO PROJETO</div>
+        
+        <table class="info-table">
+            <tbody>
+                <tr>
+                    <td>Nome do Projeto</td>
+                    <td>Sistema de Controle de Validade de Estoque</td>
+                </tr>
+                <tr>
+                    <td>Versão</td>
+                    <td>1.0 Final</td>
+                </tr>
+                <tr>
+                    <td>Data de Criação</td>
+                    <td>Março de 2026</td>
+                </tr>
+                <tr>
+                    <td>Data de Entrega</td>
+                    <td>Junho de 2026</td>
+                </tr>
+                <tr>
+                    <td>Tipo de Projeto</td>
+                    <td>Projeto de Curricularização (Análise e Desenvolvimento de Sistemas)</td>
+                </tr>
+                <tr>
+                    <td>Finalidade</td>
+                    <td>Desenvolvimento de Sistema para apoio ao controle de validade de estoque</td>
+                </tr>
+                <tr>
+                    <td>Beneficiários</td>
+                    <td>Supermercado Mariano</td>
+                </tr>
+                <tr>
+                    <td>Desenvolvedores</td>
+                    <td>Guilherme Pezzato França, Marcos Vinicius Silva Almeida, Rafael Vinicius Amaral Barbosa, Rafael Clemente Pires Fogaça.</td>
+                </tr>
+                <tr>
+                    <td>Instituição Acadêmica</td>
+                    <td>Fatec Itapetininga</td>
+                </tr>
+                <tr>
+                    <td>Supervisor Técnico</td>
+                    <td>Dra. Andréia Rodrigues Casare</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <div class="section-title">OBJETIVOS DO PROJETO</div>
+
+        <div class="subsection-title">1. Objetivo Principal</div>
+        <div class="highlight-box">
+            <h3>CONTROLE DE VALIDADE DE ESTOQUE</h3>
+            <p>Desenvolver um sistema capaz de monitorar automaticamente a validade dos produtos em estoque, auxiliando na identificação de itens próximos ao vencimento e reduzindo perdas financeiras no Supermercado Mariano.</p>
+        </div>
+
+        <div class="subsection-title">2. Objetivos Específicos</div>
+        <ul class="feature-list">
+            <li>Implementar cadastro completo de produtos com informações de validade, lote e setor</li>
+            <li>Registrar a entrada de mercadorias no estoque de forma organizada</li>
+            <li>Monitorar automaticamente produtos próximos ao vencimento (até 30 dias)</li>
+            <li>Exibir painel em TV com alertas visuais para a equipe</li>
+            <li>Desenvolver banco de dados relacional utilizando PostgreSQL</li>
+            <li>Garantir interface simples e intuitiva para usuários não técnicos</li>
+            <li>Automatizar a geração de notificações de produtos próximos ao vencimento</li>
+            <li>Centralizar as informações do estoque em um único sistema</li>
+            <li>Reduzir perdas financeiras e desperdício de produtos</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <div class="section-title">ARQUITETURA TÉCNICA PLANEJADA</div>
+        
+        <div class="subsection-title">Estrutura do Sistema</div>
+        <div class="arquitetura-box">
+Sistema de Controle de Validade com:
+├── Interface do Usuário
+│   ├── Tela de cadastro de produtos
+│   ├── Tela de listagem de produtos
+│   ├── Tela de notificações
+│   ├── Painel de exibição em tela cheia para TV
+│   ├── Tela de gerenciamento de usuários e setores
+
+├── Lógica de Negócio
+│   ├── Cadastro de produtos
+│   ├── Verificação de validade (30 dias)
+│   ├── Geração de alertas
+│   └── Controle de usuários
+├── Banco de Dados (PostgreSQL)
+│   ├── Produtos
+│   ├── Usuários
+│   ├── Setores
+│   └── Notificações
+
+└── Funcionalidades
+    ├── Monitoramento automático de validade
+    ├── Atualização automática da interface após movimentações
+    └── Exibição de painel para equipe
+        </div>
+
+        <div class="highlight-box">
+        <h3>Desenvolvimento: PostgreSQL Local</h3>
+        <p>Utilizado para desenvolvimento e testes do sistema em ambiente local</p> 
+        </div>
+        <div class="arquitetura-box">
+Sistema Backend em Python com:
+├── Models/
+│   └── produto.py (Modelos ORM SQLAlchemy)
+├── Repositories/
+│   └── produto_repository.py (Consultas em PostgreSQL)
+├── Services/
+│   ├── estoque_service.py (Regras de negócio do estoque)
+│   ├── alerta_service.py (Verificação de validade e geração de alertas)
+│   ├── notificacao_service.py (Geração de alertas)
+│   └── importacao_service.py (Importação Manual)
+├── Controllers/
+│   └── produto_controller.py (Controle das funcionalidades do sistema)
+├── Schemas/
+│   ├── produto_schema.py
+│   └── movimentacao_schema.py
+├── Config/
+│   └── database_config.py (Configuração de conexão PostgreSQL)
+└── Database/
+    └── PostgreSQL Local instalado na máquina
+        </div>
+
+        <div class="subsection-title">3. Estratégia de Banco de Dados</div>
+        
+        <div class="highlight-box">
+            <h3>Backend da Aplicação</h3>
+            <p>Desenvolvimento da lógica de negócio utilizando Python integrado ao PostgreSQL</p>
+        </div>
+        
+        <div class="highlight-box">
+            <h3>Ambiente de Demonstração: PostgreSQL</h3>
+            <p>Possibilidade futura de hospedagem remota para sincronização de dados</p>
+        </div>
+        
+        <table class="info-table">
+            <thead>
+                <tr>
+                    <th>Aspecto</th>
+                    <th>PostgreSQL Local</th>
+                    <th>Possível Hospedagem Futura</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Tipo</strong></td>
+                    <td>PostgreSQL Instância Local</td>
+                    <td>PostgreSQL 15+ hospedado</td>
+                </tr>
+                <tr>
+                <td><strong>Custo</strong></td>
+                <td>Sem custos de licenciamento</td>
+                <td>Possibilidade de utilização de serviços gratuitos de hospedagem</td>
+                </tr>
+                <tr>
+                    <td><strong>Recursos</strong></td>
+                    <td>Controle local, setup via script/docker</td>
+                    <td>Dashboard administrativo, autenticação e backup</td>
+                </tr>
+                <tr>
+                    <td><strong>Principais Tabelas</strong></td>
+                    <td colspan="2">produtos, lotes, setores, movimentacoes, alertas, usuarios</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- INÍCIO DA SEÇÃO ATUALIZADA -->
+    <div class="section page-break">
+        <div class="section-title">FUNCIONALIDADES A SEREM IMPLEMENTADAS</div>
+        
+        <div class="subsection-title">1. Gestão de Produtos e Lotes</div>
+        <ul class="feature-list">
+            <li>Cadastro rápido de produtos com suporte a código de barras (EAN)</li>
+            <li>Registro de múltiplos lotes para um mesmo produto</li>
+            <li>Classificação de produtos por setores (ex: Laticínios, Frios, Mercearia)</li>
+            <li>Busca otimizada por nome, código ou fabricante</li>
+            <li>Interface adaptada para uso em computadores do supermercado</li>
+        </ul>
+
+        <div class="subsection-title">2. Monitoramento e Alertas de Validade</div>
+        <ul class="feature-list">
+            <li>Verificação automática diária de produtos próximos ao vencimento</li>
+            <li>Alertas visuais classificados por criticidade (ex: 30, 15 e 7 dias)</li>
+            <li>Painel Dashboard otimizado para exibição contínua em TV para a equipe</li>
+            <li>Geração automática de listas de itens que precisam de ação (ex: promoção)</li>
+            <li>Atualização automática da interface após movimentações</li>
+        </ul>
+
+        <div class="subsection-title">3. Controle de Entradas e Saídas</div>
+        <ul class="feature-list">
+            <li>Registro ágil de entrada de novas mercadorias atreladas aos seus lotes</li>
+            <li>Baixa de itens por diversos motivos (venda, descarte, avaria, devolução)</li>
+            <li>Cálculo automático do saldo atual em estoque</li>
+            <li>Histórico completo de movimentações rastreáveis por usuário</li>
+            <li>Auditoria simples para correção de inventário</li>
+        </ul>
+
+        <div class="subsection-title">4. Relatórios e Métricas Gerenciais</div>
+        <ul class="feature-list">
+            <li>Dashboard com resumo da saúde do estoque e riscos financeiros</li>
+            <li>Relatórios de perdas mensais devido a vencimentos</li>
+            <li>Análise de setores com maior incidência de produtos vencidos</li>
+            <li>Exportação de dados e listagens para formato CSV/Excel</li>
+            <li>Monitoramento da meta de redução de desperdício do supermercado</li>
+        </ul>
+        
+        <div class="subsection-title">5. Backend Completo - Entidades Principais</div>
+        <table class="info-table">
+            <thead>
+                <tr>
+                    <th>Entidade</th>
+                    <th>Propósito</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Produto</strong></td>
+                    <td>Catálogo central de itens contendo nome, marca e código de barras</td>
+                </tr>
+                <tr>
+                    <td><strong>LoteValidade</strong></td>
+                    <td>Controle específico das datas de vencimento e quantidades em estoque</td>
+                </tr>
+                <tr>
+                    <td><strong>Setor</strong></td>
+                    <td>Categorização física do mercado para direcionar os alertas à equipe certa</td>
+                </tr>
+                <tr>
+                    <td><strong>Movimentacao</strong></td>
+                    <td>Histórico de entradas, saídas e descartes realizados no estoque</td>
+                </tr>
+                <tr>
+                    <td><strong>Alerta</strong></td>
+                    <td>Sistema de registro e status (lido/pendente) das notificações de validade</td>
+                </tr>
+                <tr>
+                    <td><strong>Usuário</strong></td>
+                    <td>Autenticação, controle de acessos e perfis (ex: Gerente, Repositor)</td>
+                </tr>
+                <tr>
+                    <td><strong>Configuracao</strong></td>
+                    <td>Parâmetros do sistema, como quantidade de dias para disparar os alertas</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <!-- FIM DA SEÇÃO ATUALIZADA -->
+
+    <div class="section page-break">
+    <div class="section-title">PLANO DE EXECUÇÃO DO PROJETO</div>
+    
+    <div class="subsection-title">Cronograma: 3 meses (Desenvolvimento Backend e Frontend)</div>
+    
+    <div class="subsection-title">Fases do Projeto de Curricularização</div>
+    
+    <div class="roadmap-item roadmap-planejado">
+        <div>
+            <strong>Fase 1 - Planejamento e Levantamento de Requisitos (Semanas 1-3)</strong><br>
+            Definição do escopo do sistema, levantamento de requisitos, modelagem inicial do banco de dados e definição da arquitetura técnica.
+        </div>
+    </div>
+
+    <div class="roadmap-item roadmap-planejado">
+        <div>
+            <strong>Fase 2 - Desenvolvimento da Interface Desktop (Semanas 4-6)</strong><br>
+            Implementação das telas do sistema, usabilidade, navegação e integração inicial com o banco de dados.
+        </div>
+    </div>
+
+    <div class="roadmap-item roadmap-planejado">
+        <div>
+            <strong>Fase 3 - Desenvolvimento Backend e Regras de Negócio (Semanas 7-9)</strong><br>
+            Desenvolvimento em Python, integração com PostgreSQL, implementação das funcionalidades principais e sistema de notificações.
+        </div>
+    </div>
+
+    <div class="roadmap-item roadmap-planejado">
+        <div>
+            <strong>Fase 4 - Integração, Testes e Documentação (Semanas 10-12)</strong><br>
+            Integração Frontend-Backend, testes funcionais, correções finais, otimizações e elaboração da documentação acadêmica.
+        </div>
+    </div>
+</div>
+
+    <div class="section">
+        <div class="section-title">APROVAÇÕES NECESSÁRIAS</div>
+        
+        <table class="info-table">
+            <thead>
+                <tr>
+                    <th>Tipo de Aprovação</th>
+                    <th>Responsável</th>
+                    <th>Escopo da Aprovação</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Aprovação Stakeholder</td>
+                    <td>Supermercado Mariano</td>
+                    <td>O stakeholder acompanhou a proposta do sistema e demonstrou interesse na solução desenvolvida.</td>
+                </tr>
+                <tr>
+                    <td>Aprovação Técnica e Acadêmica</td>
+                    <td>Dra. Andréia Rodrigues Casare</td>
+                    <td>Avaliação técnica do projeto e aprovação acadêmica</td>
+                </tr>
+                <tr>
+                    <td>Validação do Desenvolvimento</td>
+                    <td>Equipe de Desenvolvimento</td>
+                    <td>Garantia de qualidade técnica e funcionalidades implementadas</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="section">
+        <div class="section-title">CONCLUSÃO</div>
+        
+        <div class="highlight-box">
+            <h3>PROJETO DE CURRICULARIZAÇÃO PARA APROVAÇÃO</h3>
+            <p>O <strong>Controle de Validade de Estoque</strong> será desenvolvido como <strong>projeto de curricularização</strong> com excelência técnica e aplicação prática dos conhecimentos adquiridos no curso de Análise e Desenvolvimento de Sistemas.</p>
+            <br>
+            <p><strong>Escopo do Projeto:</strong></p>
+            <ul class="feature-list">
+                <li><strong>Sistema Desktop Completo</strong> - Sistema desenvolvido em Python integrado ao PostgreSQL</li>
+                <li><strong>Banco de Dados</strong> - PostgreSQL (ambiente de desenvolvimento e produção)</li>
+                <li><strong>Funcionalidades Principais</strong> - Gestão de produtos, Monitoramento de validade, Alertas em tela e Relatórios</li>
+                <li><strong>Métricas e Otimizações</strong> - Redução de perdas e acompanhamento do ciclo de vida dos produtos</li>
+                <li><strong>Documentação Técnica</strong> - PRD, diagramas, código documentado</li>
+            </ul>
+            <br>
+            <p><strong>Cronograma de Desenvolvimento:</strong></p>
+            <ul class="feature-list">
+                <li><strong>Duração:</strong> 3 meses (focados no desenvolvimento da interface e lógica do sistema)</li>
+                <li><strong>Estrutura:</strong> Execução em 4 fases de desenvolvimento técnico</li>
+                <li><strong>Acompanhamento:</strong> Validações acadêmicas periódicas com a orientadora</li>
+                <li><strong>Entrega:</strong> Sistema funcional em ambiente local para o Supermercado Mariano</li>
+            </ul>
+            <br>
+            <p><strong>Importante:</strong> O projeto tem como objetivo o desenvolvimento de um sistema funcional voltado ao controle de validade de estoque. O sistema será apresentado ao stakeholder para avaliação e possíveis sugestões futuras.</p>
+        </div>
+    </div>
+
+    <div class="section page-break">
+        <div class="section-title">APROVAÇÃO E ASSINATURAS</div>
+        
+        <div class="subsection-title">Aprovação Técnica</div>
+        <table class="info-table" style="width: 100%;">
+            <tr>
+                <td style="width: 25%; padding-bottom: 20px; vertical-align: bottom;"><strong>Equipe de Desenvolvimento</strong></td>
+                <td style="width: 75%; padding-bottom: 20px; padding-left: 5px; border-bottom: 1px solid #333;">
+                    <br>
+                </td>
+            </tr>
+            <tr>
+                <td></td>
+                <td style="padding-top: 5px; padding-left: 5px;">Guilherme Pezzato França</td>
+            </tr>
+            <tr>
+                <td style="padding-bottom: 20px; vertical-align: bottom;"></td>
+                <td style="padding-bottom: 20px; padding-left: 5px; border-bottom: 1px solid #333;">
+                    <br>
+                </td>
+            </tr>
+            <tr>
+                <td></td>
+                <td style="padding-top: 5px; padding-left: 5px;">Marcos Vinicius Silva Almeida</td>
+            </tr>
+            <tr>
+                <td style="padding-bottom: 20px; vertical-align: bottom;"></td>
+                <td style="padding-bottom: 20px; padding-left: 5px; border-bottom: 1px solid #333;">
+                    <br>
+                </td>
+            </tr>
+            <tr>
+                <td></td>
+                <td style="padding-top: 5px; padding-left: 5px;">Rafael Clemente Pires Fogaça</td>
+            </tr>
+            <tr>
+                <td style="padding-bottom: 20px; vertical-align: bottom;"></td>
+                <td style="padding-bottom: 20px; padding-left: 5px; border-bottom: 1px solid #333;">
+                    <br>
+                </td>
+            </tr>
+            <tr>
+                <td></td>
+                <td style="padding-top: 5px; padding-left: 5px;">Rafael Vinicius Amaral Barbosa</td>
+            </tr>
+            <tr>
+                <td style="padding-bottom: 20px; vertical-align: bottom;"></td>
+                <td style="padding-bottom: 20px; padding-left: 5px; border-bottom: 1px solid #333;">
+                    <br>
+                </td>
+            </tr>
+            <tr>
+                <td></td>
+                <td style="padding-top: 15px; padding-left: 5px;">Estudantes - Análise e Desenvolvimento de Sistemas</td>
+            </tr>
+            <tr>
+                <td><strong>Data:</strong></td>
+                <td style="padding-left: 5px;">____/____/2026</td>
+            </tr>
+        </table>
+
+        <div class="subsection-title">Aprovação Acadêmica</div>
+        <table class="info-table" style="width: 100%;">
+            <tr>
+                <td style="width: 25%; padding-bottom: 20px; vertical-align: bottom;"><strong>Orientadora Acadêmica</strong></td>
+                <td style="width: 75%; padding-bottom: 20px; padding-left: 5px; border-bottom: 1px solid #333;">
+                    <br>
+                </td>
+            </tr>
+            <tr>
+                <td></td>
+                <td style="padding-top: 5px; padding-left: 5px;">Dra. Andréia Rodrigues Casare</td>
+            </tr>
+            <tr>
+                <td></td>
+                <td style="padding-left: 5px;">FATEC Itapetininga</td>
+            </tr>
+            <tr>
+                <td><strong>Data:</strong></td>
+                <td style="padding-left: 5px;">____/____/2026</td>
+            </tr>
+        </table>
+
+        <div class="subsection-title">Aprovação do Stakeholder</div>
+        <table class="info-table" style="width: 100%;">
+            <tr>
+                <td style="width: 25%; padding-bottom: 20px; vertical-align: bottom;"><strong>Stakeholder do Projeto</strong></td>
+                <td style="width: 75%; padding-bottom: 20px; padding-left: 5px; border-bottom: 1px solid #333;">
+                    <br>
+                </td>
+            </tr>
+            <tr>
+                <td></td>
+                <td style="padding-top: 5px; padding-left: 5px;">Onofre Gomes Mariano</td>
+            </tr>
+            <tr>
+                <td></td>
+                <td style="padding-left: 5px;">Supermercado Mariano</td>
+            </tr>
+            <tr>
+                <td></td>
+                <td style="padding-top: 10px; padding-left: 5px; font-size: 10pt; font-style: italic;">
+                    Acompanhei a proposta do sistema e estou de acordo com os objetivos apresentados.
+                </td>
+            </tr>
+            <tr>
+                <td><strong>Data:</strong></td>
+                <td style="padding-left: 5px;">____/____/2026</td>
+            </tr>
+        </table>
+
+        <div class="subsection-title">Observações Finais</div>
+        <div style="border: 1px solid #ccc; padding: 15px; margin: 10px 0; min-height: 100px;">
+            <p><em>Espaço reservado para observações e comentários dos avaliadores:</em></p>
+            <br><br><br><br>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p><strong>Controle de Validade de Estoque - PRD Final</strong></p>
+        <hr style="margin: 10px 0; border: none; border-top: 1px solid #d1d5db;">
+        <p>Desenvolvido por: Guilherme, Marcos, Rafael C. e Rafael V. | Curso: Análise e Desenvolvimento de Sistemas da FATEC Itapetininga</p>
+        <p>Data: Março de 2026 | Versão: 1.0 - Proposta para Aprovação</p>
+    </div>
+
+    <div class="no-print" style="margin-top: 30px; text-align: center;">
+        <button onclick="window.print()" style="padding: 10px 20px; font-size: 16px; background-color: #3498db; color: white; border: none; cursor: pointer; border-radius: 5px;">
+            Imprimir PRD Final
+        </button>
+    </div>
+</body>
+</html>
