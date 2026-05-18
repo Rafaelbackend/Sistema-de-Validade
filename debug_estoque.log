@@ -38,3 +38,4 @@ DETAIL:  Registro que falhou contém (4, 5689, cajado de mago tier 2, null, 10, 
 2026-05-05 20:15:30,751 - INFO - [database.py:372] - Login bem-sucedido: marcos@gmail.com
 2026-05-05 20:15:56,985 - INFO - [database.py:45] - Pool de conexões Singleton iniciado.
 2026-05-05 20:16:02,684 - INFO - [database.py:372] - Login bem-sucedido: marcos@gmail.com
+2026-05-18 19:04:31,791 - ERROR - [database.py:47] - Falha crítica ao iniciar o Pool: 'utf-8' codec can't decode byte 0xe3 in position 103: invalid continuation byte
