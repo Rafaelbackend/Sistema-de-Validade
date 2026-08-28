@@ -138,3 +138,91 @@ class ViewManager:
         btn_frame.pack(fill="x")
         ttk.Button(btn_frame, text="Remover selecionado", command=remover_selecionado_colab).pack(side="right", padx=6)
         ttk.Button(btn_frame, text="Fechar", command=win.destroy).pack(side="right")
+
+    def mostrar_area_venda(self):
+
+        rows = db.listar_area_venda_db()
+
+        win = tk.Toplevel(self.root)
+        win.title("Área de Venda")
+        win.geometry("950x500")
+
+        cols = (
+            "id",
+            "codigo",
+            "nome",
+            "lote",
+            "validade",
+            "quantidade",
+            "data"
+        )
+
+        tree = ttk.Treeview(
+            win,
+            columns=cols,
+            show="headings"
+        )
+
+        headers = [
+            "ID",
+            "Código",
+            "Produto",
+            "Lote",
+            "Validade",
+            "Quantidade",
+            "Entrada"
+        ]
+
+        for c, h in zip(cols, headers):
+            tree.heading(c, text=h)
+
+            tree.column(
+                c,
+                width=130,
+                anchor="center"
+            )
+
+        tree.column("nome", width=280)
+
+        tree.pack(
+            fill="both",
+            expand=True,
+            padx=10,
+            pady=10
+        )
+
+        for r in rows:
+
+            validade = r["validade"]
+
+            if validade:
+                validade = validade.strftime("%d/%m/%Y")
+            else:
+                validade = "-"
+
+            data = r["data_entrada"]
+
+            if data:
+                data = data.strftime("%d/%m/%Y %H:%M")
+            else:
+                data = "-"
+
+            tree.insert(
+                "",
+                "end",
+                values=(
+                    r["id_area_venda"],
+                    r["codigo_barra"],
+                    r["nome_produto"],
+                    r["lote"],
+                    validade,
+                    r["quantidade"],
+                    data
+                )
+            )
+
+        ttk.Button(
+            win,
+            text="Fechar",
+            command=win.destroy
+        ).pack(pady=8)

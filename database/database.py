@@ -71,7 +71,7 @@ def listar_produtos_db():
         with conn:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
-                    SELECT id_produto, codigo_barra, nome_produto, validade, qtd_estoque, preco, lote, id_setor, id_adm
+                    SELECT id_produto, codigo_barra, nome_produto, validade, qtd_estoque, preco, lote, prateleira, id_setor, id_adm
                     FROM produto ORDER BY validade NULLS LAST, nome_produto;
                 """)
                 return cur.fetchall()
@@ -81,43 +81,370 @@ def listar_produtos_db():
     finally:
         if conn:
             db_manager.put_connection(conn)
+def buscar_produto_por_codigo_db(codigo_barra):
+    """
+    Procura um produto pelo código de barras.
 
-def inserir_produto_db(prod):
+    O código de barras pode existir em vários registros,
+    pois cada registro pode representar um lote diferente.
+
+    Retorna:
+        (True, produto) se encontrar
+        (False, None) se não encontrar
+    """
     conn = db_manager.get_connection()
+
     if not conn:
-        return False, "Sem conexão"
+        return False, None
+
     try:
         with conn:
-            with conn.cursor() as cur:
-                validade = prod.get('validade')
-                if not validade or str(validade).strip() == "":
-                    validade = None
-
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute("""
-                    INSERT INTO produto
-                    (codigo_barra, nome_produto, validade, qtd_estoque, preco, lote, id_setor, id_adm)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-                    RETURNING id_produto;
-                """, (
-                    prod.get('codigo_barra'),
-                    prod.get('nome_produto'),
-                    validade,
-                    prod.get('qtd_estoque'),
-                    prod.get('preco'),
-                    prod.get('lote'),
-                    prod.get('id_setor'),
-                    prod.get('id_adm')
-                ))
-                res = cur.fetchone()[0]
-                logger.info(f"Produto inserido com sucesso: ID {res}")
-                return True, res
+                    SELECT
+                        codigo_barra,
+                        nome_produto
+                    FROM produto
+                    WHERE codigo_barra = %s
+                    ORDER BY id_produto
+                    LIMIT 1;
+                """, (codigo_barra,))
+
+                produto = cur.fetchone()
+
+                if produto:
+                    return True, produto
+
+                return False, None
+
     except Exception as e:
-        logger.error(f"Erro ao inserir produto: {e}")
-        return False, str(e)
+        logger.error(f"Erro ao buscar produto pelo código de barras: {e}")
+        return False, None
+
     finally:
         if conn:
             db_manager.put_connection(conn)
 
+def enviar_produto_area_venda_db(id_produto, quantidade):
+    conn = db_manager.get_connection()
+
+    if not conn:
+        return False, "Sem conexão com o banco."
+
+    try:
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+
+                # Busca o produto
+                cur.execute("""
+                    SELECT
+                        id_produto,
+                        codigo_barra,
+                        nome_produto,
+                        validade,
+                        qtd_estoque,
+                        lote
+                    FROM produto
+                    WHERE id_produto = %s
+                    FOR UPDATE;
+                """, (id_produto,))
+
+                produto = cur.fetchone()
+
+                if not produto:
+                    return False, "Produto não encontrado."
+
+                estoque_atual = produto["qtd_estoque"] or 0
+
+                # Verifica estoque
+                if quantidade <= 0:
+                    return False, "A quantidade deve ser maior que zero."
+
+                if quantidade > estoque_atual:
+                    return False, (
+                        f"Quantidade solicitada: {quantidade}\n"
+                        f"Estoque disponível: {estoque_atual}"
+                    )
+
+                # Diminui o estoque
+                novo_estoque = estoque_atual - quantidade
+
+                cur.execute("""
+                    UPDATE produto
+                    SET qtd_estoque = %s
+                    WHERE id_produto = %s;
+                """, (novo_estoque, id_produto))
+
+                # Verifica se já existe na área de venda
+                cur.execute("""
+                    SELECT id_area_venda, quantidade
+                    FROM area_venda
+                    WHERE id_produto = %s;
+                """, (id_produto,))
+
+                area = cur.fetchone()
+
+                if area:
+
+                    nova_quantidade = area["quantidade"] + quantidade
+
+                    cur.execute("""
+                        UPDATE area_venda
+                        SET quantidade = %s,
+                            data_entrada = CURRENT_TIMESTAMP
+                        WHERE id_area_venda = %s;
+                    """, (
+                        nova_quantidade,
+                        area["id_area_venda"]
+                    ))
+
+                else:
+
+                    cur.execute("""
+                        INSERT INTO area_venda (
+                            id_produto,
+                            codigo_barra,
+                            nome_produto,
+                            lote,
+                            validade,
+                            quantidade
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s);
+                    """, (
+                        produto["id_produto"],
+                        produto["codigo_barra"],
+                        produto["nome_produto"],
+                        produto["lote"],
+                        produto["validade"],
+                        quantidade
+                    ))
+
+                return True, novo_estoque
+
+    except Exception as e:
+        logger.error(
+            f"Erro ao enviar produto para área de venda: {e}"
+        )
+        return False, str(e)
+
+    finally:
+        if conn:
+            db_manager.put_connection(conn)
+
+def verificar_codigo_lote_existente_db(codigo_barra, lote):
+    """
+    Verifica se já existe um registro com a mesma combinação:
+
+        código de barras + lote
+
+    O mesmo código pode ter vários lotes.
+    O mesmo lote pode existir para produtos diferentes.
+
+    Retorna:
+        True  -> combinação já existe
+        False -> combinação ainda não existe
+    """
+    conn = db_manager.get_connection()
+
+    if not conn:
+        return False
+
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT 1
+                    FROM produto
+                    WHERE codigo_barra = %s
+                      AND lote = %s
+                    LIMIT 1;
+                """, (codigo_barra, lote))
+
+                return cur.fetchone() is not None
+
+    except Exception as e:
+        logger.error(f"Erro ao verificar código + lote: {e}")
+        return False
+
+    finally:
+        if conn:
+            db_manager.put_connection(conn)
+def inserir_produto_db(prod):
+    conn = db_manager.get_connection()
+
+    if not conn:
+        return False, "Sem conexão"
+
+    try:
+        with conn:
+            with conn.cursor() as cur:
+
+                codigo_barra = prod.get('codigo_barra')
+                lote = prod.get('lote')
+
+                # -------------------------------------------------
+                # VERIFICAÇÃO DO CÓDIGO + LOTE
+                # -------------------------------------------------
+                if codigo_barra and lote:
+                    cur.execute("""
+                        SELECT 1
+                        FROM produto
+                        WHERE codigo_barra = %s
+                          AND lote = %s
+                        LIMIT 1;
+                    """, (codigo_barra, lote))
+
+                    existente = cur.fetchone()
+
+                    if existente:
+                        mensagem = (
+                            f"O lote '{lote}' já está cadastrado "
+                            f"para o código de barras '{codigo_barra}'."
+                        )
+
+                        logger.warning(mensagem)
+
+                        return False, mensagem
+
+                # -------------------------------------------------
+                # VALIDADE
+                # -------------------------------------------------
+                validade = prod.get('validade')
+
+                if not validade or str(validade).strip() == "":
+                    validade = None
+
+                # -------------------------------------------------
+                # INSERÇÃO
+                # -------------------------------------------------
+                cur.execute("""
+                    INSERT INTO produto
+                    (
+                        codigo_barra,
+                        nome_produto,
+                        validade,
+                        qtd_estoque,
+                        preco,
+                        lote,
+                        prateleira,
+                        id_setor,
+                        id_adm
+                    )
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    RETURNING id_produto;
+                """, (
+                    codigo_barra,
+                    prod.get('nome_produto'),
+                    validade,
+                    prod.get('qtd_estoque'),
+                    prod.get('preco'),
+                    lote,
+                    prod.get('prateleira'),
+                    prod.get('id_setor'),
+                    prod.get('id_adm')
+                ))
+
+                res = cur.fetchone()[0]
+
+                logger.info(
+                    f"Produto inserido com sucesso: ID {res}, "
+                    f"código {codigo_barra}, lote {lote}"
+                )
+
+                return True, res
+
+    except Exception as e:
+        logger.error(f"Erro ao inserir produto: {e}")
+        return False, str(e)
+
+    finally:
+        if conn:
+            db_manager.put_connection(conn)
+
+def listar_area_venda_db():
+
+    conn = db_manager.get_connection()
+
+    if not conn:
+        return []
+
+    try:
+        with conn:
+            with conn.cursor(
+                cursor_factory=RealDictCursor
+            ) as cur:
+
+                cur.execute("""
+                    SELECT
+                        id_area_venda,
+                        id_produto,
+                        codigo_barra,
+                        nome_produto,
+                        lote,
+                        validade,
+                        quantidade,
+                        data_entrada
+                    FROM area_venda
+                    WHERE quantidade > 0
+                    ORDER BY nome_produto;
+                """)
+
+                return cur.fetchall()
+
+    except Exception as e:
+
+        logger.error(
+            f"Erro ao listar área de venda: {e}"
+        )
+
+        return []
+
+    finally:
+
+        if conn:
+            db_manager.put_connection(conn)
+def buscar_produto_por_codigo_lote_db(codigo_barra, lote):
+    conn = db_manager.get_connection()
+
+    if not conn:
+        return False, "Sem conexão com o banco."
+
+    try:
+        with conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+
+                cur.execute("""
+                    SELECT
+                        id_produto,
+                        codigo_barra,
+                        nome_produto,
+                        validade,
+                        qtd_estoque,
+                        preco,
+                        lote,
+                        prateleira,
+                        id_setor,
+                        id_adm
+                    FROM produto
+                    WHERE codigo_barra = %s
+                      AND lote = %s
+                    LIMIT 1;
+                """, (codigo_barra, lote))
+
+                produto = cur.fetchone()
+
+                if produto:
+                    return True, produto
+
+                return False, "Produto não encontrado para este código e lote."
+
+    except Exception as e:
+        logger.error(f"Erro ao buscar produto por código e lote: {e}")
+        return False, str(e)
+
+    finally:
+        if conn:
+            db_manager.put_connection(conn)
 def remover_produto_db(id_produto):
     conn = db_manager.get_connection()
     if not conn:
@@ -168,7 +495,7 @@ def verificar_validade_db(alerta_dias=30):
         if conn:
             db_manager.put_connection(conn)
 
-def listar_notificacoes_db(limit=100):
+def listar_notificacoes_db(limit=6):
     conn = db_manager.get_connection()
     if not conn:
         return []

@@ -12,17 +12,50 @@ class FormManager:
     def abrir_form_adicionar(self):
         win = tk.Toplevel(self.root)
         win.title("Adicionar produto")
+        win.geometry("520x430")
+
         frm = ttk.Frame(win, padding=10)
         frm.pack(fill="both", expand=True)
 
-        labels = ["Código de barras", "Nome do produto", "Validade (DD-MM-YYYY)", "Quantidade", "Preço", "Lote", "ID do Setor", "ID do Admin"]
+        labels = [
+            "Código de barras", "Nome do produto", "Validade (DD-MM-YYYY)",
+            "Quantidade", "Preço", "Lote", "Prateleira", "ID do Setor", "ID do Admin"
+        ]
         entries = {}
+
         for i, lbl in enumerate(labels):
             ttk.Label(frm, text=lbl).grid(row=i, column=0, sticky="w", pady=4)
             ent = ttk.Entry(frm, width=40)
             ent.grid(row=i, column=1, pady=4, padx=6)
             entries[i] = ent
 
+        # ---------------------------------------------------------
+        # FUNÇÃO PARA RECONHECER O CÓDIGO DE BARRAS
+        # ---------------------------------------------------------
+        def reconhecer_codigo(event=None):
+            codigo = entries[0].get().strip()
+            if not codigo:
+                return
+            encontrado, produto = db.buscar_produto_por_codigo_db(codigo)
+            if encontrado:
+                nome_produto = produto.get('nome_produto')
+                entries[1].delete(0, tk.END)
+                entries[1].insert(0, nome_produto or "")
+                messagebox.showinfo("Produto encontrado",
+                                    f"Produto reconhecido:\n\nNome: {nome_produto}\n\n"
+                                    f"Agora informe o novo lote, quantidade, validade e prateleira.")
+                entries[2].focus_set()
+            else:
+                entries[1].delete(0, tk.END)
+                messagebox.showinfo("Novo produto",
+                                    "Código de barras não encontrado.\n\nEste será cadastrado como um novo produto.")
+                entries[1].focus_set()
+
+        entries[0].bind("<Return>", reconhecer_codigo)
+
+        # ---------------------------------------------------------
+        # FUNÇÃO SALVAR (APENAS A VERSÃO COMPLETA E VALIDADA)
+        # ---------------------------------------------------------
         def salvar():
             codigo = entries[0].get().strip()
             nome = entries[1].get().strip()
@@ -30,34 +63,69 @@ class FormManager:
             qtd_text = entries[3].get().strip()
             preco_text = entries[4].get().strip()
             lote = entries[5].get().strip() or None
-            id_setor = entries[6].get().strip() or None
-            id_adm = entries[7].get().strip() or None
+            prateleira = entries[6].get().strip() or None
+            id_setor = entries[7].get().strip() or None
+            id_adm = entries[8].get().strip() or None
 
-            if not codigo or not nome:
-                messagebox.showwarning("Atenção", "Código e Nome são obrigatórios.")
+            # Validações de campos obrigatórios
+            if not codigo:
+                messagebox.showwarning("Atenção", "Código de barras é obrigatório.")
+                entries[0].focus_set()
+                return
+            if not nome:
+                messagebox.showwarning("Atenção", "Nome do produto é obrigatório.")
+                entries[1].focus_set()
+                return
+            if not lote:
+                messagebox.showwarning("Atenção", "Lote é obrigatório.")
+                entries[5].focus_set()
+                return
+            if not prateleira:
+                messagebox.showwarning("Atenção", "Prateleira é obrigatória.")
+                entries[6].focus_set()
                 return
 
+            # Verificação de Código + Lote duplicados no banco
+            lote_existente = db.verificar_codigo_lote_existente_db(codigo, lote)
+            if lote_existente:
+                messagebox.showerror("Lote já cadastrado",
+                                     f"O lote '{lote}' já está cadastrado para este produto.\n\n"
+                                     f"Código de barras: {codigo}\nLote: {lote}\n\n"
+                                     f"Você deve informar outro lote.")
+                entries[5].focus_set()
+                return
+
+            # Validação da Data de Validade
             validade = None
             if validade_text:
                 try:
                     validade = datetime.strptime(validade_text, "%d-%m-%Y").date()
-                except Exception:
-                    messagebox.showwarning("Atenção", "Formato de validade inválido. Use DD-MM-YYYY.")
+                except ValueError:
+                    messagebox.showwarning("Atenção", "Formato de validade inválido.\n\nUse DD-MM-YYYY.")
+                    entries[2].focus_set()
                     return
+
+            # Validação da Quantidade
             try:
                 qtd = int(qtd_text) if qtd_text else 0
             except ValueError:
                 messagebox.showwarning("Atenção", "Quantidade deve ser número inteiro.")
+                entries[3].focus_set()
                 return
+
+            # Validação do Preço
             try:
                 preco = float(preco_text.replace(",", ".")) if preco_text else None
             except ValueError:
                 messagebox.showwarning("Atenção", "Preço inválido.")
+                entries[4].focus_set()
                 return
 
+            # Conversão de IDs relacionais
             id_setor_val = int(id_setor) if id_setor and id_setor.isdigit() else None
             id_adm_val = int(id_adm) if id_adm and id_adm.isdigit() else None
 
+            # Montagem do dicionário do produto
             prod = {
                 'codigo_barra': codigo,
                 'nome_produto': nome,
@@ -65,20 +133,280 @@ class FormManager:
                 'qtd_estoque': qtd,
                 'preco': preco,
                 'lote': lote,
+                'prateleira': prateleira,
                 'id_setor': id_setor_val,
                 'id_adm': id_adm_val
             }
-            
+
+            # Envio para o Banco de Dados
             ok, resp = db.inserir_produto_db(prod)
             if ok:
-                messagebox.showinfo("Sucesso", f"Produto criado. ID: {resp}")
+                messagebox.showinfo("Sucesso",
+                                    f"Produto cadastrado com sucesso!\n\nID: {resp}\nLote: {lote}\nPrateleira: {prateleira}")
                 win.destroy()
                 self.main_app.mostrar_lista()
             else:
-                messagebox.showerror("Erro", f"Não foi possível inserir: {resp}")
+                messagebox.showerror("Erro", f"Não foi possível inserir:\n\n{resp}")
 
+        # ---------------------------------------------------------
+        # VÍNCULO DO BOTÃO SALVAR À INTERFACE
+        # ---------------------------------------------------------
         ttk.Button(frm, text="Salvar", command=salvar).grid(row=len(labels), column=1, sticky="e", pady=8)
 
+        # Inicia o foco do teclado no campo de código de barras
+        entries[0].focus_set()
+
+    def abrir_form_area_venda(self):
+
+        win = tk.Toplevel(self.root)
+        win.title("Enviar produto para área de venda")
+        win.geometry("500x430")
+
+        frm = ttk.Frame(win, padding=15)
+        frm.pack(fill="both", expand=True)
+
+        # -----------------------------------------
+        # CÓDIGO DE BARRAS
+        # -----------------------------------------
+
+        ttk.Label(
+            frm,
+            text="Código de barras:"
+        ).grid(row=0, column=0, sticky="w", pady=5)
+
+        codigo_ent = ttk.Entry(frm, width=40)
+        codigo_ent.grid(row=0, column=1, pady=5)
+
+        # -----------------------------------------
+        # LOTE
+        # -----------------------------------------
+
+        ttk.Label(
+            frm,
+            text="Lote:"
+        ).grid(row=1, column=0, sticky="w", pady=5)
+
+        lote_ent = ttk.Entry(frm, width=40)
+        lote_ent.grid(row=1, column=1, pady=5)
+
+        # -----------------------------------------
+        # INFORMAÇÕES DO PRODUTO
+        # -----------------------------------------
+
+        info = tk.Text(
+            frm,
+            width=55,
+            height=10,
+            state="disabled"
+        )
+
+        info.grid(
+            row=3,
+            column=0,
+            columnspan=2,
+            pady=10
+        )
+
+        # -----------------------------------------
+        # QUANTIDADE
+        # -----------------------------------------
+
+        ttk.Label(
+            frm,
+            text="Quantidade para área de venda:"
+        ).grid(row=4, column=0, sticky="w", pady=5)
+
+        qtd_ent = ttk.Entry(frm, width=40)
+        qtd_ent.grid(row=4, column=1, pady=5)
+
+        produto_atual = {
+            "produto": None
+        }
+
+        # -----------------------------------------
+        # BUSCAR PRODUTO
+        # -----------------------------------------
+
+        def buscar():
+
+            codigo = codigo_ent.get().strip()
+            lote = lote_ent.get().strip()
+
+            if not codigo:
+                messagebox.showwarning(
+                    "Atenção",
+                    "Informe ou leia o código de barras."
+                )
+                codigo_ent.focus_set()
+                return
+
+            if not lote:
+                messagebox.showwarning(
+                    "Atenção",
+                    "Informe o lote."
+                )
+                lote_ent.focus_set()
+                return
+
+            encontrado, produto = db.buscar_produto_por_codigo_lote_db(
+                codigo,
+                lote
+            )
+
+            if not encontrado:
+                messagebox.showerror(
+                    "Produto não encontrado",
+                    produto
+                )
+                return
+
+            produto_atual["produto"] = produto
+
+            validade = produto["validade"]
+
+            if validade:
+                validade = validade.strftime("%d/%m/%Y")
+            else:
+                validade = "Sem validade"
+
+            texto = (
+                f"PRODUTO ENCONTRADO\n\n"
+                f"Nome: {produto['nome_produto']}\n"
+                f"Código: {produto['codigo_barra']}\n"
+                f"Lote: {produto['lote']}\n"
+                f"Validade: {validade}\n"
+                f"Prateleira: {produto.get('prateleira') or '-'}\n"
+                f"Estoque atual: {produto['qtd_estoque']}\n"
+            )
+
+            info.config(state="normal")
+            info.delete("1.0", tk.END)
+            info.insert("1.0", texto)
+            info.config(state="disabled")
+
+            qtd_ent.focus_set()
+
+        # -----------------------------------------
+        # SALVAR SAÍDA
+        # -----------------------------------------
+
+        def enviar():
+
+            produto = produto_atual["produto"]
+
+            if not produto:
+                messagebox.showwarning(
+                    "Atenção",
+                    "Primeiro informe o código de barras e o lote."
+                )
+                return
+
+            qtd_texto = qtd_ent.get().strip()
+
+            try:
+                quantidade = int(qtd_texto)
+            except ValueError:
+                messagebox.showwarning(
+                    "Atenção",
+                    "A quantidade deve ser um número inteiro."
+                )
+                qtd_ent.focus_set()
+                return
+
+            if quantidade <= 0:
+                messagebox.showwarning(
+                    "Atenção",
+                    "A quantidade deve ser maior que zero."
+                )
+                qtd_ent.focus_set()
+                return
+
+            estoque = produto["qtd_estoque"] or 0
+
+            if quantidade > estoque:
+                messagebox.showerror(
+                    "Estoque insuficiente",
+                    f"Estoque disponível: {estoque}\n"
+                    f"Quantidade solicitada: {quantidade}"
+                )
+                qtd_ent.focus_set()
+                return
+
+            confirmar = messagebox.askyesno(
+                "Confirmar saída",
+                f"Produto: {produto['nome_produto']}\n"
+                f"Lote: {produto['lote']}\n\n"
+                f"Quantidade: {quantidade}\n\n"
+                f"Enviar para a área de venda?"
+            )
+
+            if not confirmar:
+                return
+
+            ok, resposta = db.enviar_produto_area_venda_db(
+                produto["id_produto"],
+                quantidade
+            )
+
+            if ok:
+
+                messagebox.showinfo(
+                    "Sucesso",
+                    f"Produto enviado para a área de venda!\n\n"
+                    f"Produto: {produto['nome_produto']}\n"
+                    f"Quantidade enviada: {quantidade}\n"
+                    f"Estoque restante: {resposta}"
+                )
+
+                win.destroy()
+
+                self.main_app.mostrar_lista()
+
+            else:
+
+                messagebox.showerror(
+                    "Erro",
+                    f"Não foi possível realizar a saída:\n\n{resposta}"
+                )
+
+        # -----------------------------------------
+        # BOTÕES
+        # -----------------------------------------
+
+        ttk.Button(
+            frm,
+            text="Buscar produto",
+            command=buscar
+        ).grid(
+            row=2,
+            column=1,
+            sticky="e",
+            pady=5
+        )
+
+        ttk.Button(
+            frm,
+            text="Enviar para área de venda",
+            command=enviar
+        ).grid(
+            row=5,
+            column=1,
+            sticky="e",
+            pady=10
+        )
+
+        # Leitor de código de barras
+        codigo_ent.bind(
+            "<Return>",
+            lambda event: lote_ent.focus_set()
+        )
+
+        lote_ent.bind(
+            "<Return>",
+            lambda event: buscar()
+        )
+
+        codigo_ent.focus_set()
     def abrir_form_admin(self):
         win = tk.Toplevel(self.root)
         win.title("Cadastrar Administrador")

@@ -24,30 +24,54 @@ class AppMainWindow:
         self.mostrar_lista()
 
     def _setup_ui(self):
-        top = ttk.Frame(self.root, padding=8)
-        top.pack(side="top", fill="x")
+        # Container principal do topo (agora sem padding interno para os subframes controlarem o espaço)
+        top = ttk.Frame(self.root)
+        top.pack(side="top", fill="x", padx=8, pady=4)
 
-        ttk.Button(top, text="Listar produtos", command=self.mostrar_lista).pack(side="left", padx=4)
-        ttk.Button(top, text="Adicionar produto", command=self.forms.abrir_form_adicionar).pack(side="left", padx=4)
-        ttk.Button(top, text="Verificar validade (30d)", command=self.views.acao_verificar_validade).pack(side="left", padx=4)
-        ttk.Button(top, text="Listar notificações", command=self.views.mostrar_notificacoes).pack(side="left", padx=4)
+        # ----------------------------------------------------
+        # LINHA 1: Operações de Produtos e Modos de Visualização
+        # ----------------------------------------------------
+        linha1 = ttk.Frame(top, padding=4)
+        linha1.pack(side="top", fill="x")
 
-        ttk.Button(top, text="Cadastrar Admin", command=self.forms.abrir_form_admin).pack(side="left", padx=8)
-        ttk.Button(top, text="Cadastrar Setor", command=self.forms.abrir_form_setor).pack(side="left", padx=4)
-        ttk.Button(top, text="Cadastrar Colaborador", command=self.forms.abrir_form_colab).pack(side="left", padx=4)
+        ttk.Button(linha1, text="Listar produtos", command=self.mostrar_lista).pack(side="left", padx=4)
+        ttk.Button(linha1, text="Adicionar produto", command=self.forms.abrir_form_adicionar).pack(side="left", padx=4)
+        ttk.Button(linha1, text="Enviar para área de venda", command=self.forms.abrir_form_area_venda).pack(side="left",
+                                                                                                            padx=4)
+        ttk.Button(linha1, text="Área de venda", command=self.views.mostrar_area_venda).pack(side="left", padx=4)
+        ttk.Button(linha1, text="Verificar validade (30d)", command=self.views.acao_verificar_validade).pack(
+            side="left", padx=4)
+        ttk.Button(linha1, text="Listar notificações", command=self.views.mostrar_notificacoes).pack(side="left",
+                                                                                                     padx=4)
 
-        ttk.Button(top, text="Ver Administradores", command=self.views.mostrar_administradores).pack(side="left", padx=8)
-        ttk.Button(top, text="Ver Colaboradores", command=self.views.mostrar_colaboradores).pack(side="left", padx=4)
-        ttk.Button(top, text="Abrir modo TV (fullscreen)", command=self.abrir_tv_display).pack(side="right", padx=4)
-        ttk.Button(top, text="Atualizar", command=self.mostrar_lista).pack(side="right", padx=4)
+        # Botões do lado direito da Linha 1
+        ttk.Button(linha1, text="Atualizar", command=self.mostrar_lista).pack(side="right", padx=4)
+        ttk.Button(linha1, text="Abrir modo TV (fullscreen)", command=self.abrir_tv_display).pack(side="right", padx=4)
 
+        # ----------------------------------------------------
+        # LINHA 2: Cadastros Administrativos e Gerenciamento
+        # ----------------------------------------------------
+        linha2 = ttk.Frame(top, padding=4)
+        linha2.pack(side="top", fill="x", pady=(4, 0))  # Adiciona um pequeno espaçamento vertical acima da linha 2
+
+        ttk.Button(linha2, text="Cadastrar Admin", command=self.forms.abrir_form_admin).pack(side="left", padx=4)
+        ttk.Button(linha2, text="Cadastrar Setor", command=self.forms.abrir_form_setor).pack(side="left", padx=4)
+        ttk.Button(linha2, text="Cadastrar Colaborador", command=self.forms.abrir_form_colab).pack(side="left", padx=4)
+
+        ttk.Button(linha2, text="Ver Administradores", command=self.views.mostrar_administradores).pack(side="left",
+                                                                                                        padx=12)
+        ttk.Button(linha2, text="Ver Colaboradores", command=self.views.mostrar_colaboradores).pack(side="left", padx=4)
+
+        # ----------------------------------------------------
+        # MEIO DA TELA (Treeview) - Mantido igual ao seu original
+        # ----------------------------------------------------
         middle = ttk.Frame(self.root, padding=8)
         middle.pack(fill="both", expand=True)
 
-        cols = ("id", "codigo", "nome", "validade", "qtd", "preco", "lote", "setor", "responsavel")
+        cols = ("id", "codigo", "nome", "validade", "qtd", "preco", "lote", "prateleira", "setor", "responsavel")
         self.tree = ttk.Treeview(middle, columns=cols, show="headings")
-        headers = ["ID", "Código", "Nome", "Validade", "Qtd", "Preço", "Lote", "Setor", "Responsável"]
-        
+        headers = ["ID", "Código", "Nome", "Validade", "Qtd", "Preço", "Lote", "prateleira", "Setor", "Responsável"]
+
         for c, title in zip(cols, headers):
             self.tree.heading(c, text=title)
             if c == "nome":
@@ -67,9 +91,12 @@ class AppMainWindow:
         vsb.pack(side="right", fill="y")
         self.tree.pack(fill="both", expand=True, side="left")
 
+        # ----------------------------------------------------
+        # PARTE INFERIOR (Status) - Mantido igual ao seu original
+        # ----------------------------------------------------
         bottom = ttk.Frame(self.root, padding=8)
         bottom.pack(side="bottom", fill="x")
-        
+
         ttk.Button(bottom, text="Remover selecionado", command=self.remover_selecionado).pack(side="right", padx=4)
         self.status = ttk.Label(bottom, text="Pronto")
         self.status.pack(side="left")
@@ -89,7 +116,9 @@ class AppMainWindow:
             preco = f"R$ {float(r['preco']):.2f}" if r.get('preco') is not None else "-"
             setor = "-"
             responsavel = "-"
-            
+
+            conn = None
+
             try:
                 conn = db.db_manager.get_connection()
                 if conn:
@@ -131,7 +160,7 @@ class AppMainWindow:
 
             self.tree.insert("", "end",
                              values=(r['id_produto'], r.get('codigo_barra'), r.get('nome_produto'),
-                                     validade_str, r.get('qtd_estoque'), preco, r.get('lote'), setor, responsavel),
+                                     validade_str, r.get('qtd_estoque'), preco, r.get('lote'), r.get('prateleira'), setor, responsavel),
                              tags=(tag,) if tag else ())
                              
         self.atualizar_status(f"{len(rows)} produtos carregados")
