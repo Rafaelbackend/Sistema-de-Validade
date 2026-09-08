@@ -56,6 +56,8 @@ class AppMainWindow:
 
         ttk.Button(linha2, text="Cadastrar Admin", command=self.forms.abrir_form_admin).pack(side="left", padx=4)
         ttk.Button(linha2, text="Cadastrar Setor", command=self.forms.abrir_form_setor).pack(side="left", padx=4)
+        ttk.Button(linha2,text="Ver Setores",command=self.views.mostrar_setores).pack(side="left", padx=4)
+        ttk.Button(linha2,text="Remover Setor",command=self.views.remover_setor).pack(side="left", padx=4)
         ttk.Button(linha2, text="Cadastrar Colaborador", command=self.forms.abrir_form_colab).pack(side="left", padx=4)
 
         ttk.Button(linha2, text="Ver Administradores", command=self.views.mostrar_administradores).pack(side="left",
@@ -68,9 +70,9 @@ class AppMainWindow:
         middle = ttk.Frame(self.root, padding=8)
         middle.pack(fill="both", expand=True)
 
-        cols = ("id", "codigo", "nome", "validade", "qtd", "preco", "lote", "prateleira", "setor", "responsavel")
+        cols = ("ID", "Codigo", "Nome", "Validade", "Qtd", "Preco", "Lote", "Prateleira","Corredor", "Setor", "Responsavel")
         self.tree = ttk.Treeview(middle, columns=cols, show="headings")
-        headers = ["ID", "Código", "Nome", "Validade", "Qtd", "Preço", "Lote", "prateleira", "Setor", "Responsável"]
+        headers = ["ID", "Código", "Nome", "Validade", "Qtd", "Preço", "Lote", "Prateleira","Corredor", "Setor", "Responsável"]
 
         for c, title in zip(cols, headers):
             self.tree.heading(c, text=title)
@@ -160,7 +162,8 @@ class AppMainWindow:
 
             self.tree.insert("", "end",
                              values=(r['id_produto'], r.get('codigo_barra'), r.get('nome_produto'),
-                                     validade_str, r.get('qtd_estoque'), preco, r.get('lote'), r.get('prateleira'), setor, responsavel),
+                                     validade_str, r.get('qtd_estoque'), preco, r.get('lote'), r.get('prateleira'),
+                                     r.get('corredor'), setor, responsavel),
                              tags=(tag,) if tag else ())
                              
         self.atualizar_status(f"{len(rows)} produtos carregados")

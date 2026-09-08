@@ -18,8 +18,8 @@ class FormManager:
         frm.pack(fill="both", expand=True)
 
         labels = [
-            "Código de barras", "Nome do produto", "Validade (DD-MM-YYYY)",
-            "Quantidade", "Preço", "Lote", "Prateleira", "ID do Setor", "ID do Admin"
+            "Código de barras", "Nome do produto", "Validade (DD/MM/YYYY)",
+            "Quantidade", "Preço", "Lote", "Prateleira","Corredor", "ID do Setor"
         ]
         entries = {}
 
@@ -29,6 +29,31 @@ class FormManager:
             ent.grid(row=i, column=1, pady=4, padx=6)
             entries[i] = ent
 
+        def aplicar_mascara_data(event):
+            # Permite a ação de apagar sem que a máscara adicione a barra novamente
+            if event.keysym in ("BackSpace", "Delete"):
+                return
+
+            entry_validade = entries[2]
+            texto_atual = entry_validade.get()
+
+            # Extrai apenas dígitos
+            numeros = "".join(filter(str.isdigit, texto_atual))[:8]
+
+            # Constrói o formato com as barras
+            formatado = ""
+            for idx, char in enumerate(numeros):
+                if idx in (2, 4):
+                    formatado += "/"
+                formatado += char
+
+            # Atualiza o campo mantendo o texto formatado apenas se houve alteração
+            if texto_atual != formatado:
+                entry_validade.delete(0, tk.END)
+                entry_validade.insert(0, formatado)
+
+        # Associa a máscara ao campo de validade (índice 2)
+        entries[2].bind("<KeyRelease>", aplicar_mascara_data)
         # ---------------------------------------------------------
         # FUNÇÃO PARA RECONHECER O CÓDIGO DE BARRAS
         # ---------------------------------------------------------
@@ -43,7 +68,7 @@ class FormManager:
                 entries[1].insert(0, nome_produto or "")
                 messagebox.showinfo("Produto encontrado",
                                     f"Produto reconhecido:\n\nNome: {nome_produto}\n\n"
-                                    f"Agora informe o novo lote, quantidade, validade e prateleira.")
+                                    f"Agora informe o novo lote, quantidade, validade, prateleira e corredor.")
                 entries[2].focus_set()
             else:
                 entries[1].delete(0, tk.END)
@@ -64,8 +89,27 @@ class FormManager:
             preco_text = entries[4].get().strip()
             lote = entries[5].get().strip() or None
             prateleira = entries[6].get().strip() or None
-            id_setor = entries[7].get().strip() or None
-            id_adm = entries[8].get().strip() or None
+            corredor = entries[7].get().strip() or None
+            id_setor = entries[8].get().strip() or None
+
+            # Obtém automaticamente o administrador que está logado
+            administrador_logado = self.main_app.current_admin
+
+            if not administrador_logado:
+                messagebox.showerror(
+                    "Erro",
+                    "Não foi possível identificar o administrador logado."
+                )
+                return
+
+            id_adm = administrador_logado.get("id_adm")
+
+            if not id_adm:
+                messagebox.showerror(
+                    "Erro",
+                    "O administrador logado não possui um ID válido."
+                )
+                return
 
             # Validações de campos obrigatórios
             if not codigo:
@@ -84,6 +128,10 @@ class FormManager:
                 messagebox.showwarning("Atenção", "Prateleira é obrigatória.")
                 entries[6].focus_set()
                 return
+            if not corredor:
+                messagebox.showwarning("Atenção","Corredor é obrigatório.")
+                entries[7].focus_set()
+                return
 
             # Verificação de Código + Lote duplicados no banco
             lote_existente = db.verificar_codigo_lote_existente_db(codigo, lote)
@@ -101,7 +149,7 @@ class FormManager:
                 try:
                     validade = datetime.strptime(validade_text, "%d-%m-%Y").date()
                 except ValueError:
-                    messagebox.showwarning("Atenção", "Formato de validade inválido.\n\nUse DD-MM-YYYY.")
+                    messagebox.showwarning("Atenção", "Formato de validade inválido.\n\nUse DD/MM/YYYY.")
                     entries[2].focus_set()
                     return
 
@@ -123,7 +171,7 @@ class FormManager:
 
             # Conversão de IDs relacionais
             id_setor_val = int(id_setor) if id_setor and id_setor.isdigit() else None
-            id_adm_val = int(id_adm) if id_adm and id_adm.isdigit() else None
+            id_adm_val = int(id_adm)
 
             # Montagem do dicionário do produto
             prod = {
@@ -134,6 +182,7 @@ class FormManager:
                 'preco': preco,
                 'lote': lote,
                 'prateleira': prateleira,
+                'corredor': corredor,
                 'id_setor': id_setor_val,
                 'id_adm': id_adm_val
             }
@@ -141,8 +190,14 @@ class FormManager:
             # Envio para o Banco de Dados
             ok, resp = db.inserir_produto_db(prod)
             if ok:
-                messagebox.showinfo("Sucesso",
-                                    f"Produto cadastrado com sucesso!\n\nID: {resp}\nLote: {lote}\nPrateleira: {prateleira}")
+                messagebox.showinfo(
+                    "Sucesso",
+                    f"Produto cadastrado com sucesso!\n\n"
+                    f"ID: {resp}\n"
+                    f"Lote: {lote}\n"
+                    f"Prateleira: {prateleira}\n"
+                    f"Corredor: {corredor}"
+                )
                 win.destroy()
                 self.main_app.mostrar_lista()
             else:

@@ -9,6 +9,171 @@ class ViewManager:
         self.main_app = main_app
         self.root = main_app.root
 
+    def mostrar_setores(self):
+        rows = db.listar_setores_db()
+
+        win = tk.Toplevel(self.root)
+        win.title("Setores cadastrados")
+        win.geometry("500x400")
+
+        cols = ("id_setor", "nome_setor")
+
+        tree = ttk.Treeview(
+            win,
+            columns=cols,
+            show="headings"
+        )
+
+        tree.heading("id_setor", text="ID")
+        tree.heading("nome_setor", text="Nome do setor")
+
+        tree.column(
+            "id_setor",
+            width=80,
+            anchor="center"
+        )
+
+        tree.column(
+            "nome_setor",
+            width=350,
+            anchor="w"
+        )
+
+        tree.pack(
+            fill="both",
+            expand=True,
+            padx=10,
+            pady=10
+        )
+
+        for setor in rows:
+            tree.insert(
+                "",
+                "end",
+                values=(
+                    setor["id_setor"],
+                    setor["nome_setor"]
+                )
+            )
+
+        ttk.Button(
+            win,
+            text="Fechar",
+            command=win.destroy
+        ).pack(pady=8)
+
+    def remover_setor(self):
+        rows = db.listar_setores_db()
+
+        if not rows:
+            messagebox.showinfo(
+                "Setores",
+                "Não existem setores cadastrados."
+            )
+            return
+
+        win = tk.Toplevel(self.root)
+        win.title("Remover setor")
+        win.geometry("500x400")
+
+        cols = ("id_setor", "nome_setor")
+
+        tree = ttk.Treeview(
+            win,
+            columns=cols,
+            show="headings"
+        )
+
+        tree.heading("id_setor", text="ID")
+        tree.heading("nome_setor", text="Nome do setor")
+
+        tree.column(
+            "id_setor",
+            width=80,
+            anchor="center"
+        )
+
+        tree.column(
+            "nome_setor",
+            width=350,
+            anchor="w"
+        )
+
+        tree.pack(
+            fill="both",
+            expand=True,
+            padx=10,
+            pady=10
+        )
+
+        for setor in rows:
+            tree.insert(
+                "",
+                "end",
+                values=(
+                    setor["id_setor"],
+                    setor["nome_setor"]
+                )
+            )
+
+        def remover_selecionado():
+
+            selecionado = tree.selection()
+
+            if not selecionado:
+                messagebox.showwarning(
+                    "Atenção",
+                    "Selecione um setor para remover."
+                )
+                return
+
+            valores = tree.item(selecionado[0])["values"]
+
+            id_setor = valores[0]
+            nome_setor = valores[1]
+
+            confirmar = messagebox.askyesno(
+                "Confirmar remoção",
+                f"Deseja realmente remover o setor?\n\n"
+                f"ID: {id_setor}\n"
+                f"Nome: {nome_setor}"
+            )
+
+            if not confirmar:
+                return
+
+            ok, resposta = db.remover_setor_db(id_setor)
+
+            if ok:
+                messagebox.showinfo(
+                    "Sucesso",
+                    f"Setor '{nome_setor}' removido com sucesso."
+                )
+
+                tree.delete(selecionado[0])
+
+                self.main_app.mostrar_lista()
+
+            else:
+                messagebox.showerror(
+                    "Não foi possível remover",
+                    resposta
+                )
+
+        botoes = ttk.Frame(win, padding=8)
+        botoes.pack(fill="x")
+
+        ttk.Button(
+            botoes,
+            text="Remover selecionado",
+            command=remover_selecionado
+        ).pack(side="right", padx=5)
+
+        ttk.Button(
+            botoes,
+            text="Fechar",
+            command=win.destroy
+        ).pack(side="right")
     def acao_verificar_validade(self):
         produtos = db.verificar_validade_db(30)
         if not produtos:

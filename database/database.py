@@ -327,10 +327,11 @@ def inserir_produto_db(prod):
                         preco,
                         lote,
                         prateleira,
+                        corredor,
                         id_setor,
                         id_adm
                     )
-                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                     RETURNING id_produto;
                 """, (
                     codigo_barra,
@@ -340,6 +341,7 @@ def inserir_produto_db(prod):
                     prod.get('preco'),
                     lote,
                     prod.get('prateleira'),
+                    prod.get('corredor'),
                     prod.get('id_setor'),
                     prod.get('id_adm')
                 ))
@@ -423,6 +425,7 @@ def buscar_produto_por_codigo_lote_db(codigo_barra, lote):
                         preco,
                         lote,
                         prateleira,
+                        corredor,
                         id_setor,
                         id_adm
                     FROM produto
@@ -614,6 +617,69 @@ def inserir_setor_db(nome):
         if conn:
             db_manager.put_connection(conn)
 
+def remover_setor_db(id_setor):
+    conn = db_manager.get_connection()
+
+    if not conn:
+        return False, "Sem conexão"
+
+    try:
+        with conn:
+            with conn.cursor() as cur:
+
+                # Verifica se existem produtos vinculados ao setor
+                cur.execute("""
+                    SELECT COUNT(*)
+                    FROM produto
+                    WHERE id_setor = %s;
+                """, (id_setor,))
+
+                quantidade_produtos = cur.fetchone()[0]
+
+                if quantidade_produtos > 0:
+                    return False, (
+                        f"Não é possível remover este setor porque "
+                        f"existem {quantidade_produtos} produto(s) "
+                        f"vinculado(s) a ele."
+                    )
+
+                # Verifica se existem colaboradores vinculados ao setor
+                cur.execute("""
+                    SELECT COUNT(*)
+                    FROM colaborador
+                    WHERE id_setor = %s;
+                """, (id_setor,))
+
+                quantidade_colaboradores = cur.fetchone()[0]
+
+                if quantidade_colaboradores > 0:
+                    return False, (
+                        f"Não é possível remover este setor porque "
+                        f"existem {quantidade_colaboradores} colaborador(es) "
+                        f"vinculado(s) a ele."
+                    )
+
+                cur.execute("""
+                    DELETE FROM setor
+                    WHERE id_setor = %s;
+                """, (id_setor,))
+
+                if cur.rowcount == 0:
+                    return False, "Setor não encontrado."
+
+                logger.info(
+                    f"Setor removido com sucesso: ID {id_setor}"
+                )
+
+                return True, cur.rowcount
+
+    except Exception as e:
+        logger.error(f"Erro ao remover setor: {e}")
+        return False, str(e)
+
+    finally:
+        if conn:
+            db_manager.put_connection(conn)
 def inserir_colaborador_db(nome, email_celular, cargo, id_adm=None, id_setor=None):
     conn = db_manager.get_connection()
     if not conn:
